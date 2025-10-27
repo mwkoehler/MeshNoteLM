@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="AINotes.Views.ThreePanePage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:controls="clr-namespace:AINotes.Controls"> 
+
+    <Grid RowDefinitions="Auto, *" Padding="12">
+        <!-- Simple header with a segmented menu -->
+        <HorizontalStackLayout Spacing="8">
+            <Button Text="A" Clicked="OnAFull" />
+            <Button Text="B" Clicked="OnBFull" />
+            <Button Text="C" Clicked="OnCFull" />
+            <Button Text="A|B" Clicked="OnAB" />
+            <Button Text="A|C" Clicked="OnAC" />
+            <Button Text="B|C" Clicked="OnBC" />
+        </HorizontalStackLayout>
+
+        <controls:ThreePaneLayout x:Name="PaneHost" Grid.Row="1">
+            <controls:ThreePaneLayout.PaneA>
+                <Border StrokeThickness="1">
+                    <ScrollView>
+                        <VerticalStackLayout Padding="12" Spacing="12">
+                            <Label Text="Pane A" FontAttributes="Bold" />
+                            <!-- your content A -->
+                        </VerticalStackLayout>
+                    </ScrollView>
+                </Border>
+            </controls:ThreePaneLayout.PaneA>
+
+            <controls:ThreePaneLayout.PaneB>
+                <Border StrokeThickness="1">
+                    <ScrollView>
+                        <VerticalStackLayout Padding="12" Spacing="12">
+                            <Label Text="Pane B" FontAttributes="Bold" />
+                            <!-- your content B -->
+                        </VerticalStackLayout>
+                    </ScrollView>
+                </Border>
+            </controls:ThreePaneLayout.PaneB>
+
+            <controls:ThreePaneLayout.PaneC>
+                <Border StrokeThickness="1">
+                    <ScrollView>
+                        <VerticalStackLayout Padding="12" Spacing="12">
+                            <Label Text="Pane C" FontAttributes="Bold" />
+                            <!-- your content C -->
+                        </VerticalStackLayout>
+                    </ScrollView>
+                </Border>
+            </controls:ThreePaneLayout.PaneC>
+        </controls:ThreePaneLayout>
+    </Grid>
+</ContentPage>

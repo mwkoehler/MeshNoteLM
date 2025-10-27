@@ -1,0 +1,60 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.2" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageReference Include="Moq" Version="4.20.72" />
+    <PackageReference Include="FluentAssertions" Version="7.0.0" />
+    <PackageReference Include="sqlite-net-e" Version="1.10.0-beta2" />
+    <PackageReference Include="SQLitePCLRaw.bundle_green" Version="2.1.10" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Identity.Client" Version="4.69.0" />
+    <PackageReference Include="Microsoft.Maui.Essentials" Version="9.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <!-- Reference specific files from the main project instead of the whole project -->
+  <ItemGroup>
+    <Compile Include="..\MeshNoteLM\Models\**\*.cs" LinkBase="Models" />
+    <Compile Include="..\MeshNoteLM\Interfaces\**\*.cs" LinkBase="Interfaces" />
+    <Compile Include="..\MeshNoteLM\Services\NoteService.cs" Link="Services\NoteService.cs" />
+    <Compile Include="..\MeshNoteLM\Services\AppDatabase.cs" Link="Services\AppDatabase.cs" />
+    <Compile Include="..\MeshNoteLM\Services\SettingsService.cs" Link="Services\SettingsService.cs" />
+    <Compile Include="..\MeshNoteLM\Services\PdfCacheService.cs" Link="Services\PdfCacheService.cs" />
+    <Compile Include="..\MeshNoteLM\Services\LLMChatSession.cs" Link="Services\LLMChatSession.cs" />
+    <Compile Include="..\MeshNoteLM\Services\ActivatorUtilities.cs" Link="Services\ActivatorUtilities.cs" />
+    <Compile Include="..\MeshNoteLM\Services\MicrosoftAuthService.cs" Link="Services\MicrosoftAuthService.cs" />
+    <Compile Include="..\MeshNoteLM\Services\MicrosoftGraphOfficeConverter.cs" Link="Services\MicrosoftGraphOfficeConverter.cs" />
+    <Compile Include="..\MeshNoteLM\Helpers\MarkdownRegexs.cs" Link="Helpers\MarkdownRegexs.cs" />
+    <Compile Include="..\MeshNoteLM\Helpers\FileTypeDetector.cs" Link="Helpers\FileTypeDetector.cs" />
+    <Compile Include="..\MeshNoteLM\Helpers\FileViewerLogic.cs" Link="Helpers\FileViewerLogic.cs" />
+    <Compile Include="..\MeshNoteLM\Helpers\TreeLogic.cs" Link="Helpers\TreeLogic.cs" />
+    <Compile Include="..\MeshNoteLM\Helpers\TreeBuilderLogic.cs" Link="Helpers\TreeBuilderLogic.cs" />
+    <Compile Include="..\MeshNoteLM\Helpers\PathSecurityLogic.cs" Link="Helpers\PathSecurityLogic.cs" />
+    <Compile Include="..\MeshNoteLM\Plugins\PluginBase.cs" Link="Plugins\PluginBase.cs" />
+    <Compile Include="..\MeshNoteLM\Plugins\AIProviderPluginBase.cs" Link="Plugins\AIProviderPluginBase.cs" />
+    <Compile Include="..\MeshNoteLM\Plugins\PluginManager.cs" Link="Plugins\PluginManager.cs" />
+    <!-- Now testable with IFileSystemService: AppDatabase, SettingsService, PdfCacheService -->
+    <!-- Now testable: LLMChatSession, MarkdownRegexs, FileTypeDetector, TreeLogic, Models -->
+    <!-- Now testable: AIProviderPluginBase (via MockAIProviderPlugin) -->
+    <!-- Excluded due to MAUI UI dependencies: FileViewerHelper, TreeBuilder, TreeNodeViewModel, FileSystemSource -->
+    <!-- Excluded due to full MAUI dependencies: NoteEditorViewModel, SourcesTreeViewModel -->
+    <!-- Excluded due to DI dependencies: PluginManager, MicrosoftAuthService, MicrosoftGraphOfficeConverter -->
+  </ItemGroup>
+
+</Project>

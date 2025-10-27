@@ -1,0 +1,25 @@
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewModels="clr-namespace:MeshNoteLM.ViewModels"
+             xmlns:local="clr-namespace:MeshNoteLM"
+             x:DataType="local:ViewModels.NoteViewModel"
+             x:Class="MeshNoteLM.Views.NoteEditorPage">
+
+    <VerticalStackLayout Padding="10" Spacing="10">
+
+        <!-- Editor for Note Content -->
+        <Editor Text="{Binding Text, Mode=TwoWay}"
+                HeightRequest="150"
+                Placeholder="XX Enter note text here..." />
+
+        <!-- Save Button -->
+        <Button Text="Save"
+                Command="{Binding SaveNoteCommand}" />
+
+        <!-- Chat Header -->
+        <Label Text="Chat"
+               FontAttributes="Bold"
+               FontSize="18" />
+
+    </VerticalStackLayout>
+</ContentPage>

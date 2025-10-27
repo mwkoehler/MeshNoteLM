@@ -1,0 +1,40 @@
+﻿<!--
+    <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:AINotes"
+             Class="AINotes.Views.MainPageOld" 
+             x:DataType="local:ViewModels.NoteListViewModel"
+             Title="Notes">
+    <VerticalStackLayout Padding="10" Spacing="10">
+
+        <!-- Search Bar -- >
+        <Entry x:Name="SearchBar"
+               Placeholder="Search notes..."
+               TextChanged="SearchBar_TextChanged" />
+
+        <!-- Notes List -- >
+        <CollectionView x:Name="NotesList"
+                        SelectionMode="Single"
+                        SelectionChanged="NotesList_SelectionChanged">
+            <CollectionView.ItemTemplate>
+                <DataTemplate>
+                    <Border Margin="5"
+                           BackgroundColor="LightGray">
+                        <Label Text="{Binding Text}"
+                               x:DataType="local:ViewModels.NoteViewModel"
+                               Padding="10"
+                               FontSize="16" />
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <!-- Add New Note Button - - >
+        <ImageButton Source="plus.png"
+                     Clicked="ImageButton_Clicked"
+                     HorizontalOptions="Center"
+                     HeightRequest="40"
+                     WidthRequest="40" />
+    <  VerticalStackLayout>
+<  ContentPage>
+-->
