@@ -217,6 +217,29 @@ namespace MeshNoteLM.Views
                 Margin = new Thickness(0, 2, 0, 0)
             };
 
+            var copyButton = new Button
+            {
+                Text = "📋 Copy Error",
+                WidthRequest = 100,
+                HeightRequest = 30,
+                FontSize = 10,
+                Padding = new Thickness(5),
+                Margin = new Thickness(0, 5, 0, 0),
+                IsVisible = false, // Only show when there's an error
+                HorizontalOptions = LayoutOptions.Start
+            };
+
+            var statusRow = new VerticalStackLayout
+            {
+                Spacing = 5,
+                Children = { statusLabel, copyButton }
+            };
+
+            // Configure status label for better text wrapping
+            statusLabel.LineBreakMode = LineBreakMode.WordWrap;
+            statusLabel.MaxLines = 5; // Allow up to 5 lines for long error messages
+            statusLabel.HorizontalTextAlignment = TextAlignment.Start;
+
             saveButton.Clicked += async (s, e) =>
             {
                 statusIcon.Text = "⏳";
@@ -231,15 +254,18 @@ namespace MeshNoteLM.Views
                 {
                     statusIcon.Text = "❌";
                     statusLabel.TextColor = Colors.Red;
+                    copyButton.IsVisible = true; // Show copy button for errors
                 }
                 else if (result.Contains("Valid") || result.Contains("enabled"))
                 {
                     statusIcon.Text = "✓";
                     statusLabel.TextColor = Colors.Green;
+                    copyButton.IsVisible = false; // Hide copy button for success
                 }
                 else
                 {
                     statusIcon.Text = "⏳";
+                    copyButton.IsVisible = false; // Hide copy button for pending
                 }
 
                 _sourcesTreeViewModel.RefreshTree();
@@ -252,8 +278,21 @@ namespace MeshNoteLM.Views
                 _sourcesTreeViewModel.RefreshTree();
             };
 
+            copyButton.Clicked += async (s, e) =>
+            {
+                if (!string.IsNullOrWhiteSpace(statusLabel.Text))
+                {
+                    await Clipboard.Default.SetTextAsync(statusLabel.Text);
+                    // Brief feedback to user
+                    var originalText = copyButton.Text;
+                    copyButton.Text = "✓";
+                    await Task.Delay(1000);
+                    copyButton.Text = originalText;
+                }
+            };
+
             section.Children.Add(entryRow);
-            section.Children.Add(statusLabel);
+            section.Children.Add(statusRow);
 
             _llmProvidersLayout.Children.Add(section);
 
@@ -264,15 +303,28 @@ namespace MeshNoteLM.Views
                 MainThread.BeginInvokeOnMainThread(async () =>
                 {
                     statusIcon.Text = "⏳";
+                    statusLabel.Text = "Testing...";
+                    statusLabel.TextColor = Colors.Gray;
                     var result = await providerInfo.SaveAction(apiKey);
+
+                    statusLabel.Text = result;
 
                     if (result.Contains("Invalid") || result.Contains("Error"))
                     {
                         statusIcon.Text = "❌";
+                        statusLabel.TextColor = Colors.Red;
+                        copyButton.IsVisible = true; // Show copy button for errors
                     }
                     else if (result.Contains("Valid") || result.Contains("enabled"))
                     {
                         statusIcon.Text = "✓";
+                        statusLabel.TextColor = Colors.Green;
+                        copyButton.IsVisible = false; // Hide copy button for success
+                    }
+                    else
+                    {
+                        statusIcon.Text = "⏳";
+                        copyButton.IsVisible = false; // Hide copy button for pending
                     }
                 });
             });
@@ -354,6 +406,29 @@ namespace MeshNoteLM.Views
                 Margin = new Thickness(0, 2, 0, 0)
             };
 
+            var copyButton = new Button
+            {
+                Text = "📋 Copy Error",
+                WidthRequest = 100,
+                HeightRequest = 30,
+                FontSize = 10,
+                Padding = new Thickness(5),
+                Margin = new Thickness(0, 5, 0, 0),
+                IsVisible = false, // Only show when there's an error
+                HorizontalOptions = LayoutOptions.Start
+            };
+
+            var statusRow = new VerticalStackLayout
+            {
+                Spacing = 5,
+                Children = { statusLabel, copyButton }
+            };
+
+            // Configure status label for better text wrapping
+            statusLabel.LineBreakMode = LineBreakMode.WordWrap;
+            statusLabel.MaxLines = 5; // Allow up to 5 lines for long error messages
+            statusLabel.HorizontalTextAlignment = TextAlignment.Start;
+
             saveButton.Clicked += async (s, e) =>
             {
                 statusLabel.Text = "Saving...";
@@ -362,15 +437,28 @@ namespace MeshNoteLM.Views
                 var result = await onSave(entry.Text?.Trim());
 
                 statusLabel.Text = result;
-                statusLabel.TextColor = result.Contains("Invalid") || result.Contains("Error")
-                    ? Colors.Red
-                    : Colors.Green;
+                bool isError = result.Contains("Invalid") || result.Contains("Error");
+                statusLabel.TextColor = isError ? Colors.Red : Colors.Green;
+                copyButton.IsVisible = isError; // Show copy button for errors
 
                 _sourcesTreeViewModel.RefreshTree();
             };
 
+            copyButton.Clicked += async (s, e) =>
+            {
+                if (!string.IsNullOrWhiteSpace(statusLabel.Text))
+                {
+                    await Clipboard.Default.SetTextAsync(statusLabel.Text);
+                    // Brief feedback to user
+                    var originalText = copyButton.Text;
+                    copyButton.Text = "✓";
+                    await Task.Delay(1000);
+                    copyButton.Text = originalText;
+                }
+            };
+
             section.Children.Add(entryRow);
-            section.Children.Add(statusLabel);
+            section.Children.Add(statusRow);
 
             _mainLayout.Children.Add(section);
         }
@@ -413,6 +501,29 @@ namespace MeshNoteLM.Views
                 Margin = new Thickness(0, 2, 0, 0)
             };
 
+            var copyButton = new Button
+            {
+                Text = "📋 Copy Error",
+                WidthRequest = 100,
+                HeightRequest = 30,
+                FontSize = 10,
+                Padding = new Thickness(5),
+                Margin = new Thickness(0, 5, 0, 0),
+                IsVisible = false, // Only show when there's an error
+                HorizontalOptions = LayoutOptions.Start
+            };
+
+            var statusRow = new VerticalStackLayout
+            {
+                Spacing = 5,
+                Children = { statusLabel, copyButton }
+            };
+
+            // Configure status label for better text wrapping
+            statusLabel.LineBreakMode = LineBreakMode.WordWrap;
+            statusLabel.MaxLines = 5; // Allow up to 5 lines for long error messages
+            statusLabel.HorizontalTextAlignment = TextAlignment.Start;
+
             saveButton.Clicked += async (s, e) =>
             {
                 statusLabel.Text = "Testing...";
@@ -421,15 +532,28 @@ namespace MeshNoteLM.Views
                 var result = await onSave(entry.Text?.Trim());
 
                 statusLabel.Text = result;
-                statusLabel.TextColor = result.Contains("Invalid") || result.Contains("Error")
-                    ? Colors.Red
-                    : Colors.Green;
+                bool isError = result.Contains("Invalid") || result.Contains("Error");
+                statusLabel.TextColor = isError ? Colors.Red : Colors.Green;
+                copyButton.IsVisible = isError; // Show copy button for errors
 
                 _sourcesTreeViewModel.RefreshTree();
             };
 
+            copyButton.Clicked += async (s, e) =>
+            {
+                if (!string.IsNullOrWhiteSpace(statusLabel.Text))
+                {
+                    await Clipboard.Default.SetTextAsync(statusLabel.Text);
+                    // Brief feedback to user
+                    var originalText = copyButton.Text;
+                    copyButton.Text = "✓";
+                    await Task.Delay(1000);
+                    copyButton.Text = originalText;
+                }
+            };
+
             section.Children.Add(entryRow);
-            section.Children.Add(statusLabel);
+            section.Children.Add(statusRow);
 
             _mainLayout.Children.Add(section);
         }

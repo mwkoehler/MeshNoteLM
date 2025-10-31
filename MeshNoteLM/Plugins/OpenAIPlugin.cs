@@ -59,6 +59,7 @@ public class OpenAIPlugin : AIProviderPluginBase
     {
         if (!string.IsNullOrWhiteSpace(_apiKey))
         {
+            _httpClient.DefaultRequestHeaders.Clear();
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
         }
     }
@@ -155,7 +156,7 @@ public class OpenAIPlugin : AIProviderPluginBase
             else
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
-                return (false, $"Error - {response.StatusCode}");
+                return (false, $"Error - {response.StatusCode}: {errorContent}");
             }
         }
         catch (Exception ex)

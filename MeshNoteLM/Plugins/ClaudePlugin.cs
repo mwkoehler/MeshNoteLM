@@ -59,6 +59,7 @@ public class ClaudePlugin : AIProviderPluginBase
     {
         if (!string.IsNullOrWhiteSpace(_apiKey))
         {
+            _httpClient.DefaultRequestHeaders.Clear();
             _httpClient.DefaultRequestHeaders.Add("x-api-key", _apiKey);
             _httpClient.DefaultRequestHeaders.Add("anthropic-version", API_VERSION);
         }
@@ -157,7 +158,7 @@ public class ClaudePlugin : AIProviderPluginBase
             else
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
-                return (false, $"Error - {response.StatusCode}");
+                return (false, $"Error - {response.StatusCode}: {errorContent}");
             }
         }
         catch (Exception ex)

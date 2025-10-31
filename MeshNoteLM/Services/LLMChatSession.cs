@@ -24,6 +24,7 @@ public class LLMChatSession
     private string? _currentFilePath;
     private string? _currentFileContent;
     private string? _chatFilePath;
+    private bool _isDirectChatFile = false; // Flag to track if we're using direct chat file
 
     /// <summary>
     /// All messages in the current conversation
@@ -43,6 +44,7 @@ public class LLMChatSession
                 SaveCurrentSession();
                 _currentFilePath = value;
                 _chatFilePath = GetChatFilePath(value);
+                _isDirectChatFile = false; // Reset flag when context file is set
                 LoadSessionFromFile();
             }
         }
@@ -56,6 +58,11 @@ public class LLMChatSession
         get => _currentFileContent;
         set => _currentFileContent = value;
     }
+
+    /// <summary>
+    /// Check if the chat session is properly configured (has either context file or direct chat file)
+    /// </summary>
+    public bool IsConfigured => !string.IsNullOrEmpty(_currentFilePath) || _isDirectChatFile;
 
     /// <summary>
     /// Add a user message to the conversation
@@ -243,6 +250,24 @@ public class LLMChatSession
             return null;
 
         return filePath + ".chat.md";
+    }
+
+    /// <summary>
+    /// Set the chat file path directly (for chats without context files)
+    /// </summary>
+    public void SetChatFilePath(string chatFilePath)
+    {
+        System.Diagnostics.Debug.WriteLine($"[LLMChatSession] SetChatFilePath called with: '{chatFilePath}'");
+        SaveCurrentSession();
+        _currentFilePath = null; // No context file
+        _currentFileContent = null; // No context file content
+        _chatFilePath = chatFilePath; // Direct chat file path
+        _isDirectChatFile = true; // Mark as direct chat file
+        System.Diagnostics.Debug.WriteLine($"[LLMChatSession] SetChatFilePath - _chatFilePath set to: '{_chatFilePath}'");
+        System.Diagnostics.Debug.WriteLine($"[LLMChatSession] SetChatFilePath - _isDirectChatFile set to: {_isDirectChatFile}");
+        System.Diagnostics.Debug.WriteLine($"[LLMChatSession] SetChatFilePath - IsConfigured: {IsConfigured}");
+        LoadSessionFromFile();
+        System.Diagnostics.Debug.WriteLine($"[LLMChatSession] SetChatFilePath - After LoadSessionFromFile - IsConfigured: {IsConfigured}");
     }
 
     /// <summary>

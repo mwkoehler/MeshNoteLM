@@ -10,6 +10,7 @@ namespace MeshNoteLM.Views;
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Maui.Controls;
@@ -53,7 +54,7 @@ public partial class LLMChatView : ContentView
     }
 
     /// <summary>
-    /// Select the default LLM (first enabled AI provider)
+    /// Select the default LLM (first enabled AI provider with valid API key)
     /// </summary>
     private void SelectDefaultLLM()
     {
@@ -73,14 +74,18 @@ public partial class LLMChatView : ContentView
         var enabledProviders = aiProviders.Where(p => p.IsEnabled).ToList();
         System.Diagnostics.Debug.WriteLine($"[LLMChatView] Enabled AI providers: {enabledProviders.Count}");
 
-        _selectedLLM = enabledProviders.FirstOrDefault();
+        // Select only providers with valid API keys
+        var validProviders = enabledProviders.Where(p => p.HasValidAuthorization()).ToList();
+        System.Diagnostics.Debug.WriteLine($"[LLMChatView] Valid AI providers (with API keys): {validProviders.Count}");
+
+        _selectedLLM = validProviders.FirstOrDefault();
         if (_selectedLLM != null)
         {
             System.Diagnostics.Debug.WriteLine($"[LLMChatView] Selected default LLM: {_selectedLLM.Name}");
         }
         else
         {
-            System.Diagnostics.Debug.WriteLine($"[LLMChatView] No enabled LLM providers available");
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] No valid LLM providers available");
         }
 
         UpdateLLMButtonText();
@@ -93,7 +98,7 @@ public partial class LLMChatView : ContentView
     {
         if (_selectedLLM != null)
         {
-            LLMSelectorButton.Text = $"LLM: {_selectedLLM.Name}";
+            LLMSelectorButton.Text = _selectedLLM.Name;
         }
         else
         {
@@ -108,31 +113,51 @@ public partial class LLMChatView : ContentView
     private async void OnLLMSelectorClicked(object sender, EventArgs e)
     {
         // Refresh plugin list in case they were loaded after construction
-        var aiProviders = _pluginManager.GetAllPlugins()
+        var allAIProviders = _pluginManager.GetAllPlugins()
             .OfType<AIProviderPluginBase>()
             .Where(p => p.IsEnabled)
             .ToList();
 
-        if (aiProviders.Count == 0)
+        // Filter to only include providers with valid authorization (API keys)
+        var validAIProviders = allAIProviders
+            .Where(p => p.HasValidAuthorization())
+            .ToList();
+
+        System.Diagnostics.Debug.WriteLine($"[LLMChatView] Total enabled AI providers: {allAIProviders.Count}");
+        System.Diagnostics.Debug.WriteLine($"[LLMChatView] Valid AI providers (with API keys): {validAIProviders.Count}");
+
+        foreach (var provider in allAIProviders)
         {
-            await DisplayAlert("No LLMs Available", "Please enable at least one LLM provider in Settings.\n\nMake sure you have:\n1. Added an API key for at least one LLM provider\n2. The provider shows as enabled in Settings", "OK");
+            var hasAuth = provider.HasValidAuthorization();
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView]   - {provider.Name}: Enabled={provider.IsEnabled}, HasAuth={hasAuth}");
+        }
+
+        if (validAIProviders.Count == 0)
+        {
+            var message = allAIProviders.Count == 0
+                ? "No LLM providers are enabled. Please enable at least one LLM provider in Settings."
+                : "No LLM providers have valid API keys configured. Please add API keys for your LLM providers in Settings.";
+
+            await DisplayAlert("No LLMs Available", $"{message}\n\nMake sure you have:\n1. Added an API key for at least one LLM provider\n2. The provider shows as enabled in Settings", "OK");
             return;
         }
 
-        // If no LLM was previously selected, select the first one
-        if (_selectedLLM == null && aiProviders.Count > 0)
+        // If current selection is invalid, select the first valid one
+        if (_selectedLLM == null || !validAIProviders.Contains(_selectedLLM))
         {
-            _selectedLLM = aiProviders.First();
+            _selectedLLM = validAIProviders.First();
             UpdateLLMButtonText();
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] Auto-selected LLM: {_selectedLLM.Name}");
         }
 
-        var providerNames = aiProviders.Select(p => p.Name).ToArray();
+        var providerNames = validAIProviders.Select(p => p.Name).ToArray();
         var selected = await DisplayActionSheet("Select LLM Provider", "Cancel", null, providerNames);
 
         if (selected != null && selected != "Cancel")
         {
-            _selectedLLM = aiProviders.FirstOrDefault(p => p.Name == selected);
+            _selectedLLM = validAIProviders.FirstOrDefault(p => p.Name == selected);
             UpdateLLMButtonText();
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] User selected LLM: {_selectedLLM?.Name}");
         }
     }
 
@@ -145,14 +170,29 @@ public partial class LLMChatView : ContentView
         if (string.IsNullOrEmpty(userMessage))
             return;
 
-        // Check if we have a file selected
-        if (string.IsNullOrEmpty(_chatSession.CurrentFilePath))
-        {
-            var savePath = await PromptForSaveLocation();
-            if (string.IsNullOrEmpty(savePath))
-                return;
+        // Check if we have a file selected or chat configured
+        System.Diagnostics.Debug.WriteLine($"[LLMChatView] OnSendClicked - IsConfigured: '{_chatSession.IsConfigured}', CurrentFilePath: '{_chatSession.CurrentFilePath}'");
 
-            _chatSession.CurrentFilePath = savePath;
+        if (!_chatSession.IsConfigured)
+        {
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] Chat not configured, prompting for save location");
+            var savePath = await PromptForSaveLocation();
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] PromptForSaveLocation returned: '{savePath}' (length: {savePath?.Length ?? 0})");
+
+            if (string.IsNullOrEmpty(savePath))
+            {
+                System.Diagnostics.Debug.WriteLine($"[LLMChatView] User cancelled save location prompt or empty path returned");
+                return;
+            }
+
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] User selected save path: '{savePath}'");
+            // For direct chat files (no context file), set the chat file path directly
+            _chatSession.SetChatFilePath(savePath);
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] After SetChatFilePath - IsConfigured: '{_chatSession.IsConfigured}'");
+        }
+        else
+        {
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] Chat already configured - CurrentFilePath: '{_chatSession.CurrentFilePath}'");
         }
 
         // Check if we have an LLM selected
@@ -225,7 +265,7 @@ public partial class LLMChatView : ContentView
     {
         var otherLLMs = _pluginManager.GetAllPlugins()
             .OfType<AIProviderPluginBase>()
-            .Where(p => p.IsEnabled && p != _selectedLLM)
+            .Where(p => p.IsEnabled && p.HasValidAuthorization() && p != _selectedLLM)
             .ToList();
 
         var options = new List<string> { "Retry with same LLM" };
@@ -271,13 +311,57 @@ public partial class LLMChatView : ContentView
     /// </summary>
     private async Task<string?> PromptForSaveLocation()
     {
+        // Get platform-specific Documents folder
+        var documentsFolder = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+
+        // Create default filename with current date-time
+        var defaultFileName = $"{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.chat.md";
+        var defaultPath = System.IO.Path.Combine(documentsFolder, defaultFileName);
+
+        System.Diagnostics.Debug.WriteLine($"[LLMChatView] PromptForSaveLocation - Documents folder: '{documentsFolder}'");
+        System.Diagnostics.Debug.WriteLine($"[LLMChatView] PromptForSaveLocation - Default filename: '{defaultFileName}'");
+        System.Diagnostics.Debug.WriteLine($"[LLMChatView] PromptForSaveLocation - Default path: '{defaultPath}'");
+
+        // If Documents folder path is empty or invalid, use a simpler fallback
+        if (string.IsNullOrEmpty(documentsFolder) || documentsFolder.Length < 5)
+        {
+            defaultPath = defaultFileName; // Just use the filename
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] PromptForSaveLocation - Using fallback path: '{defaultPath}'");
+        }
+
+        // Try the prompt dialog with a shorter message and default value
         var result = await DisplayPromptAsync(
-            "Save Location",
-            "Enter the file path where the chat should be saved:",
+            "Save Chat",
+            "Enter file name or accept default:",
             "Save",
             "Cancel",
-            "chat_session.txt"
+            defaultFileName // Use shorter default value
         );
+
+        System.Diagnostics.Debug.WriteLine($"[LLMChatView] PromptForSaveLocation - DisplayPromptAsync result: '{result}' (length: {result?.Length ?? 0})");
+
+        // Check if user cancelled the dialog
+        if (result == null)
+        {
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] PromptForSaveLocation - User clicked Cancel");
+            return null; // Return null to indicate cancellation
+        }
+
+        // Check if user entered empty text and clicked OK
+        if (string.IsNullOrEmpty(result))
+        {
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] PromptForSaveLocation - User entered empty text, using default path");
+            result = defaultPath;
+        }
+        else
+        {
+            // If user provided just a filename, combine with Documents folder
+            if (!result.Contains('\\') && !result.Contains('/'))
+            {
+                result = System.IO.Path.Combine(documentsFolder, result);
+                System.Diagnostics.Debug.WriteLine($"[LLMChatView] PromptForSaveLocation - Combined with Documents folder: '{result}'");
+            }
+        }
 
         return result;
     }
@@ -327,17 +411,18 @@ public partial class LLMChatView : ContentView
 
         if (message.Role == "user")
         {
-            header.Text = $"You - {message.Timestamp:HH:mm:ss}";
+            var llmName = _selectedLLM?.Name ?? "LLM";
+            header.Text = $"You -> {llmName} - {message.Timestamp:HH:mm:ss}";
             border.BackgroundColor = Color.FromArgb("#E3F2FD");
         }
         else if (message.IsError)
         {
-            header.Text = $"{message.LLMProvider} (Error) - {message.Timestamp:HH:mm:ss}";
+            header.Text = $"{message.LLMProvider} Error - {message.Timestamp:HH:mm:ss}";
             border.BackgroundColor = Color.FromArgb("#FFEBEE");
         }
         else
         {
-            header.Text = $"{message.LLMProvider} - {message.Timestamp:HH:mm:ss}";
+            header.Text = $"{message.LLMProvider} replied - {message.Timestamp:HH:mm:ss}";
             border.BackgroundColor = Color.FromArgb("#F1F8E9");
         }
 

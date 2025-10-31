@@ -31,8 +31,8 @@ namespace MeshNoteLM.Plugins;
 
 public class GeminiPlugin : AIProviderPluginBase
 {
-    private const string API_BASE = "https://generativelanguage.googleapis.com/v1beta";
-    private const string DEFAULT_MODEL = "gemini-1.5-flash-latest";
+    private const string API_BASE = "https://generativelanguage.googleapis.com/v1";
+    private const string DEFAULT_MODEL = "gemini-2.0-flash";
 
     public override string Name => "Gemini";
     public override string Version => "0.1";
@@ -56,7 +56,9 @@ public class GeminiPlugin : AIProviderPluginBase
 
     protected override void ConfigureHttpClient()
     {
-        // Gemini uses query parameter authentication, so no headers needed
+        // Clear any existing headers to ensure clean state
+        _httpClient.DefaultRequestHeaders.Clear();
+        // Gemini uses query parameter authentication, no headers needed
     }
 
     protected override async Task<string> SendMessageToProviderAsync(List<Message> conversationHistory, string userMessage)
@@ -126,9 +128,15 @@ public class GeminiPlugin : AIProviderPluginBase
 
     protected override IEnumerable<string> GetAvailableModels()
     {
-        yield return "gemini-1.5-pro-latest";
-        yield return "gemini-1.5-flash-latest";
-        yield return "gemini-pro";
+        // Models available from ListModels API call
+        yield return "gemini-2.5-flash";
+        yield return "gemini-2.5-pro";
+        yield return "gemini-2.0-flash";
+        yield return "gemini-2.0-flash-001";
+        yield return "gemini-2.0-flash-lite-001";
+        yield return "gemini-2.0-flash-lite";
+        yield return "gemini-2.5-flash-lite";
+        // Note: embedding models are for embeddings, not chat
     }
 
     public override async Task<(bool Success, string Message)> TestConnectionAsync()
@@ -168,14 +176,61 @@ public class GeminiPlugin : AIProviderPluginBase
             {
                 return (false, "Invalid - Authentication failed");
             }
+            else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                var availableModels = await ListAvailableModelsAsync();
+                return (false, $"Error - {response.StatusCode}: Model '{DEFAULT_MODEL}' not found. Available models for your API key: {availableModels}");
+            }
             else
             {
-                return (false, $"Error - {response.StatusCode}");
+                var errorContent = await response.Content.ReadAsStringAsync();
+                return (false, $"Error - {response.StatusCode}: {errorContent}");
             }
         }
         catch (Exception ex)
         {
             return (false, $"Error - {ex.Message}");
+        }
+    }
+
+    private async Task<string> ListAvailableModelsAsync()
+    {
+        try
+        {
+            var listModelsUrl = $"{API_BASE}/models?key={_apiKey}";
+            var response = await _httpClient.GetAsync(listModelsUrl);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var responseJson = await response.Content.ReadAsStringAsync();
+                var doc = JsonDocument.Parse(responseJson);
+
+                var models = new List<string>();
+                if (doc.RootElement.TryGetProperty("models", out var modelsArray))
+                {
+                    foreach (var model in modelsArray.EnumerateArray())
+                    {
+                        if (model.TryGetProperty("name", out var nameProp))
+                        {
+                            var fullName = nameProp.GetString() ?? "";
+                            // Extract just the model name from the full path (e.g., "models/gemini-pro" -> "gemini-pro")
+                            var modelName = fullName.Replace("models/", "");
+                            models.Add(modelName);
+                        }
+                    }
+                }
+
+                return models.Count > 0 ? string.Join(", ", models) : "No models found";
+            }
+            else
+            {
+                return $"Failed to list models: {response.StatusCode}";
+            }
+        }
+        catch (Exception ex)
+        {
+            return $"Error listing models: {ex.Message}";
         }
     }
 }
