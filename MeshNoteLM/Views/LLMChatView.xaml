@@ -4,7 +4,7 @@
              x:Class="MeshNoteLM.Views.LLMChatView">
     <Grid RowDefinitions="Auto,*,Auto" Padding="10">
 
-        <!-- Header with LLM Selector -->
+        <!-- Header with LLM Stack -->
         <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
             <Label Grid.Column="0"
                    Text="LLM Chat"
@@ -12,13 +12,10 @@
                    FontAttributes="Bold"
                    VerticalOptions="Center"/>
 
-            <Button Grid.Column="1"
-                    x:Name="LLMSelectorButton"
-                    Text="Select LLM"
-                    Clicked="OnLLMSelectorClicked"
-                    BackgroundColor="#512BD4"
-                    TextColor="White"
-                    Padding="15,8"/>
+            <!-- VerticalStackLayout for LLM buttons -->
+            <VerticalStackLayout Grid.Column="1" x:Name="LLMButtonsStack" Spacing="2">
+                <!-- LLM buttons will be added programmatically -->
+            </VerticalStackLayout>
         </Grid>
 
         <!-- Chat Messages ScrollView -->

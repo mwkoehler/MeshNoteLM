@@ -24,7 +24,9 @@ public partial class LLMChatView : ContentView
 {
     private readonly LLMChatSession _chatSession;
     private readonly PluginManager _pluginManager;
-    private AIProviderPluginBase? _selectedLLM;
+    private readonly List<AIProviderPluginBase> _selectedLLMs = new();
+    private readonly Dictionary<Button, AIProviderPluginBase> _llmButtonMap = new();
+    private readonly Dictionary<string, Color> _llmColors = new();
 
     public LLMChatView()
     {
@@ -34,11 +36,32 @@ public partial class LLMChatView : ContentView
         _pluginManager = AppServices.Services?.GetService<PluginManager>()
             ?? throw new InvalidOperationException("PluginManager not available");
 
+        // Initialize LLM color mappings
+        InitializeLLMColors();
+
         // Subscribe to message collection changes
         _chatSession.Messages.CollectionChanged += (s, e) => RefreshMessageDisplay();
 
         // Hook into Loaded event to ensure plugins are available
         this.Loaded += (s, e) => SelectDefaultLLM();
+    }
+
+    /// <summary>
+    /// Initialize color mappings for different LLM providers
+    /// </summary>
+    private void InitializeLLMColors()
+    {
+        // Assign distinct light colors for different LLM providers
+        _llmColors["Claude"] = Color.FromArgb("#FFF3E0"); // Light Orange
+        _llmColors["OpenAI"] = Color.FromArgb("#E8F5E8"); // Light Green
+        _llmColors["Gemini"] = Color.FromArgb("#E3F2FD"); // Light Blue
+        _llmColors["Grok"] = Color.FromArgb("#FCE4EC"); // Light Pink
+        _llmColors["LLaMA"] = Color.FromArgb("#F3E5F5"); // Light Purple
+        _llmColors["Mistral"] = Color.FromArgb("#FFF8E1"); // Light Yellow
+        _llmColors["Perplexity"] = Color.FromArgb("#E0F2F1"); // Light Teal
+        _llmColors["Cohere"] = Color.FromArgb("#FBE9E7"); // Light Red
+        _llmColors["Hugging Face"] = Color.FromArgb("#E8EAF6"); // Light Indigo
+        _llmColors["Anthropic"] = Color.FromArgb("#FFF3E0"); // Light Orange (same as Claude)
     }
 
     /// <summary>
@@ -78,89 +101,98 @@ public partial class LLMChatView : ContentView
         var validProviders = enabledProviders.Where(p => p.HasValidAuthorization()).ToList();
         System.Diagnostics.Debug.WriteLine($"[LLMChatView] Valid AI providers (with API keys): {validProviders.Count}");
 
-        _selectedLLM = validProviders.FirstOrDefault();
-        if (_selectedLLM != null)
+        _selectedLLMs.AddRange(validProviders);
+        if (_selectedLLMs.Count > 0)
         {
-            System.Diagnostics.Debug.WriteLine($"[LLMChatView] Selected default LLM: {_selectedLLM.Name}");
+            var llmNames = string.Join(", ", _selectedLLMs.Select(llm => llm.Name));
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] Selected default LLMs: {llmNames}");
         }
         else
         {
             System.Diagnostics.Debug.WriteLine($"[LLMChatView] No valid LLM providers available");
         }
 
-        UpdateLLMButtonText();
+        CreateLLMButtons();
     }
 
     /// <summary>
-    /// Update the LLM selector button text
+    /// Update the LLM buttons highlighting for multi-selection
     /// </summary>
-    private void UpdateLLMButtonText()
+    private void UpdateLLMButtons()
     {
-        if (_selectedLLM != null)
+        foreach (var kvp in _llmButtonMap)
         {
-            LLMSelectorButton.Text = _selectedLLM.Name;
+            var button = kvp.Key;
+            var llm = kvp.Value;
+
+            if (_selectedLLMs.Contains(llm))
+            {
+                // Highlight selected LLMs
+                button.BackgroundColor = Color.FromArgb("#512BD4");
+                button.TextColor = Colors.White;
+            }
+            else
+            {
+                // Unhighlight other LLMs
+                button.BackgroundColor = Colors.LightGray;
+                button.TextColor = Colors.Black;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Create LLM buttons for all enabled providers
+    /// </summary>
+    private void CreateLLMButtons()
+    {
+        LLMButtonsStack.Children.Clear();
+        _llmButtonMap.Clear();
+
+        var enabledLLMs = _pluginManager.GetAllPlugins()
+            .OfType<AIProviderPluginBase>()
+            .Where(p => p.IsEnabled && p.HasValidAuthorization())
+            .ToList();
+
+        foreach (var llm in enabledLLMs)
+        {
+            var button = new Button
+            {
+                Text = llm.Name,
+                Padding = new Thickness(10, 5),
+                FontSize = 12,
+                WidthRequest = 80,
+                HeightRequest = 30
+            };
+
+            button.Clicked += (s, e) => SelectLLM(llm);
+
+            _llmButtonMap[button] = llm;
+            LLMButtonsStack.Children.Add(button);
+        }
+
+        UpdateLLMButtons();
+    }
+
+    /// <summary>
+    /// Toggle LLM selection and update highlighting
+    /// </summary>
+    private void SelectLLM(AIProviderPluginBase llm)
+    {
+        if (_selectedLLMs.Contains(llm))
+        {
+            _selectedLLMs.Remove(llm);
         }
         else
         {
-            LLMSelectorButton.Text = "No LLM Available";
-            LLMSelectorButton.IsEnabled = false;
+            _selectedLLMs.Add(llm);
         }
+
+        UpdateLLMButtons();
+        var llmNames = string.Join(", ", _selectedLLMs.Select(l => l.Name));
+        System.Diagnostics.Debug.WriteLine($"[LLMChatView] Selected LLMs: {llmNames}");
     }
 
-    /// <summary>
-    /// Handle LLM selector button click
-    /// </summary>
-    private async void OnLLMSelectorClicked(object sender, EventArgs e)
-    {
-        // Refresh plugin list in case they were loaded after construction
-        var allAIProviders = _pluginManager.GetAllPlugins()
-            .OfType<AIProviderPluginBase>()
-            .Where(p => p.IsEnabled)
-            .ToList();
-
-        // Filter to only include providers with valid authorization (API keys)
-        var validAIProviders = allAIProviders
-            .Where(p => p.HasValidAuthorization())
-            .ToList();
-
-        System.Diagnostics.Debug.WriteLine($"[LLMChatView] Total enabled AI providers: {allAIProviders.Count}");
-        System.Diagnostics.Debug.WriteLine($"[LLMChatView] Valid AI providers (with API keys): {validAIProviders.Count}");
-
-        foreach (var provider in allAIProviders)
-        {
-            var hasAuth = provider.HasValidAuthorization();
-            System.Diagnostics.Debug.WriteLine($"[LLMChatView]   - {provider.Name}: Enabled={provider.IsEnabled}, HasAuth={hasAuth}");
-        }
-
-        if (validAIProviders.Count == 0)
-        {
-            var message = allAIProviders.Count == 0
-                ? "No LLM providers are enabled. Please enable at least one LLM provider in Settings."
-                : "No LLM providers have valid API keys configured. Please add API keys for your LLM providers in Settings.";
-
-            await DisplayAlert("No LLMs Available", $"{message}\n\nMake sure you have:\n1. Added an API key for at least one LLM provider\n2. The provider shows as enabled in Settings", "OK");
-            return;
-        }
-
-        // If current selection is invalid, select the first valid one
-        if (_selectedLLM == null || !validAIProviders.Contains(_selectedLLM))
-        {
-            _selectedLLM = validAIProviders.First();
-            UpdateLLMButtonText();
-            System.Diagnostics.Debug.WriteLine($"[LLMChatView] Auto-selected LLM: {_selectedLLM.Name}");
-        }
-
-        var providerNames = validAIProviders.Select(p => p.Name).ToArray();
-        var selected = await DisplayActionSheet("Select LLM Provider", "Cancel", null, providerNames);
-
-        if (selected != null && selected != "Cancel")
-        {
-            _selectedLLM = validAIProviders.FirstOrDefault(p => p.Name == selected);
-            UpdateLLMButtonText();
-            System.Diagnostics.Debug.WriteLine($"[LLMChatView] User selected LLM: {_selectedLLM?.Name}");
-        }
-    }
-
+    
     /// <summary>
     /// Handle send button click
     /// </summary>
@@ -195,10 +227,10 @@ public partial class LLMChatView : ContentView
             System.Diagnostics.Debug.WriteLine($"[LLMChatView] Chat already configured - CurrentFilePath: '{_chatSession.CurrentFilePath}'");
         }
 
-        // Check if we have an LLM selected
-        if (_selectedLLM == null)
+        // Check if we have any LLMs selected
+        if (_selectedLLMs.Count == 0)
         {
-            await DisplayAlert("No LLM Selected", "Please select an LLM provider first.", "OK");
+            await DisplayAlert("No LLM Selected", "Please select at least one LLM provider.", "OK");
             return;
         }
 
@@ -211,11 +243,11 @@ public partial class LLMChatView : ContentView
     }
 
     /// <summary>
-    /// Send message to the selected LLM
+    /// Send message to all selected LLMs
     /// </summary>
     private async Task SendMessageToLLM(string userMessage)
     {
-        if (_selectedLLM == null)
+        if (_selectedLLMs.Count == 0)
             return;
 
         try
@@ -246,14 +278,27 @@ public partial class LLMChatView : ContentView
                 history.Add((msg.Role, msg.Content));
             }
 
-            // Send message to LLM
-            var response = await _selectedLLM.SendChatMessageAsync(history, userMessage);
+            // Send message to all selected LLMs in parallel
+            var tasks = _selectedLLMs.Select(async llm =>
+            {
+                try
+                {
+                    var response = await llm.SendChatMessageAsync(history, userMessage);
+                    _chatSession.AddAssistantMessage(response, llm.Name);
+                }
+                catch (Exception ex)
+                {
+                    _chatSession.AddErrorMessage(ex.Message, llm.Name);
+                }
+            });
 
-            _chatSession.AddAssistantMessage(response, _selectedLLM.Name);
+            await Task.WhenAll(tasks);
         }
         catch (Exception ex)
         {
-            _chatSession.AddErrorMessage(ex.Message, _selectedLLM.Name);
+            // If there's a general error (not specific to one LLM), add error message
+            var llmNames = string.Join(", ", _selectedLLMs.Select(llm => llm.Name));
+            _chatSession.AddErrorMessage(ex.Message, llmNames);
             await HandleLLMError(ex);
         }
     }
@@ -265,10 +310,10 @@ public partial class LLMChatView : ContentView
     {
         var otherLLMs = _pluginManager.GetAllPlugins()
             .OfType<AIProviderPluginBase>()
-            .Where(p => p.IsEnabled && p.HasValidAuthorization() && p != _selectedLLM)
+            .Where(p => p.IsEnabled && p.HasValidAuthorization() && !_selectedLLMs.Contains(p))
             .ToList();
 
-        var options = new List<string> { "Retry with same LLM" };
+        var options = new List<string> { "Retry with same LLMs" };
 
         if (otherLLMs.Count > 0)
         {
@@ -284,7 +329,7 @@ public partial class LLMChatView : ContentView
             [.. options]
         );
 
-        if (action == "Retry with same LLM")
+        if (action == "Retry with same LLMs")
         {
             var lastUserMessage = _chatSession.Messages.LastOrDefault(m => m.Role == "user");
             if (lastUserMessage != null)
@@ -295,8 +340,13 @@ public partial class LLMChatView : ContentView
         else if (action != null && action.StartsWith("Try with "))
         {
             var llmName = action["Try with ".Length..];
-            _selectedLLM = otherLLMs.FirstOrDefault(llm => llm.Name == llmName);
-            UpdateLLMButtonText();
+            var newLLM = otherLLMs.FirstOrDefault(llm => llm.Name == llmName);
+            if (newLLM != null)
+            {
+                _selectedLLMs.Clear();
+                _selectedLLMs.Add(newLLM);
+                UpdateLLMButtons();
+            }
 
             var lastUserMessage = _chatSession.Messages.LastOrDefault(m => m.Role == "user");
             if (lastUserMessage != null)
@@ -411,19 +461,40 @@ public partial class LLMChatView : ContentView
 
         if (message.Role == "user")
         {
-            var llmName = _selectedLLM?.Name ?? "LLM";
-            header.Text = $"You -> {llmName} - {message.Timestamp:HH:mm:ss}";
+            var llmNames = _selectedLLMs.Count > 0
+                ? string.Join(", ", _selectedLLMs.Select(llm => llm.Name))
+                : "LLM";
+            header.Text = $"You -> {llmNames} - {message.Timestamp:HH:mm:ss}";
             border.BackgroundColor = Color.FromArgb("#E3F2FD");
         }
         else if (message.IsError)
         {
-            header.Text = $"{message.LLMProvider} Error - {message.Timestamp:HH:mm:ss}";
-            border.BackgroundColor = Color.FromArgb("#FFEBEE");
+            header.Text = $"{message.LLMProvider ?? "LLM"} Error - {message.Timestamp:HH:mm:ss}";
+            // Use a light red background for errors, but still try to get LLM-specific color
+            var llmProvider = message.LLMProvider ?? "";
+            if (_llmColors.TryGetValue(llmProvider, out var errorColor))
+            {
+                // Blend with light red - make it slightly darker/pinker
+                border.BackgroundColor = Color.FromArgb("#FFCDD2"); // Light red
+            }
+            else
+            {
+                border.BackgroundColor = Color.FromArgb("#FFEBEE"); // Default light red
+            }
         }
         else
         {
-            header.Text = $"{message.LLMProvider} replied - {message.Timestamp:HH:mm:ss}";
-            border.BackgroundColor = Color.FromArgb("#F1F8E9");
+            header.Text = $"{message.LLMProvider ?? "LLM"} replied - {message.Timestamp:HH:mm:ss}";
+            // Use LLM-specific color for normal responses
+            var llmProvider = message.LLMProvider ?? "";
+            if (_llmColors.TryGetValue(llmProvider, out var llmColor))
+            {
+                border.BackgroundColor = llmColor;
+            }
+            else
+            {
+                border.BackgroundColor = Color.FromArgb("#F1F8E9"); // Default light green
+            }
         }
 
         stack.Children.Add(header);
