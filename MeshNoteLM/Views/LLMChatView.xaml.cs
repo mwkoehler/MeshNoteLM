@@ -51,12 +51,41 @@ public partial class LLMChatView : ContentView
     }
 
     /// <summary>
-    /// Handle Enter key press in Editor
+    /// Handle Enter key press in Editor by checking for new line character
+    /// Detects Enter (sends message) vs Shift+Enter (adds new line)
     /// </summary>
-    private void OnMessageInputCompleted(object sender, EventArgs e)
+    private void OnMessageInputTextChanged(object sender, TextChangedEventArgs e)
     {
-        // Enter key was pressed - send the message
-        _ = SendMessage();
+        var text = e.NewTextValue ?? string.Empty;
+        var oldText = e.OldTextValue ?? string.Empty;
+
+        // Only process when text is added (not deleted)
+        if (text.Length > oldText.Length)
+        {
+            // Check if the last character is a newline (Enter key press)
+            if (text.EndsWith('\n') || text.EndsWith('\r'))
+            {
+                // Check if it's a single newline at the end (Enter) vs multi-line content (Shift+Enter)
+                var lines = text.Split('\r', '\n', StringSplitOptions.RemoveEmptyEntries);
+                var isMultiLine = lines.Length > 1 && text.Trim('\r', '\n').Contains('\n') || text.Trim('\r', '\n').Contains('\r');
+
+                if (!isMultiLine)
+                {
+                    // Single Enter press - remove the trailing newline and send message
+                    var cleanText = text.TrimEnd('\r', '\n');
+
+                    // Update the editor text without the newline
+                    MessageInput.Text = cleanText;
+
+                    // Send the message if it's not empty
+                    if (!string.IsNullOrWhiteSpace(cleanText))
+                    {
+                        _ = SendMessage();
+                    }
+                }
+                // If it's multi-line (Shift+Enter), let the newline stay for proper formatting
+            }
+        }
     }
 
     /// <summary>
@@ -64,8 +93,8 @@ public partial class LLMChatView : ContentView
     /// </summary>
     private static void SetupKeyboardHandlers()
     {
-        // The Completed event on the Editor will handle Enter key
-        // Shift+Enter will create a new line (default Editor behavior)
+        // Enter key is handled via TextChanged event by detecting newline characters
+        // Shift+Enter will create a new line (multi-line detection in TextChanged)
 
         System.Diagnostics.Debug.WriteLine("[LLMChatView] Keyboard setup: Enter to send, Shift+Enter for new line");
     }

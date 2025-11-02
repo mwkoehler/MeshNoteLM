@@ -43,7 +43,7 @@
                     VerticalOptions="Fill"
                     HorizontalOptions="Fill"
                     Keyboard="Chat"
-                    Completed="OnMessageInputCompleted"/>
+                    TextChanged="OnMessageInputTextChanged"/>
 
             <Button Grid.Column="1"
                     Text="Send"
