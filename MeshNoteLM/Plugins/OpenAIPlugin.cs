@@ -153,6 +153,19 @@ public class OpenAIPlugin : AIProviderPluginBase
             {
                 return (false, "Invalid - Authentication failed");
             }
+            else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                // Model not found - try to get available models from OpenAI API
+                var availableModels = await GetAvailableModelsFromApiAsync();
+                if (!string.IsNullOrEmpty(availableModels))
+                {
+                    return (false, $"Error - Model '{DEFAULT_MODEL}' not found. Available models: {availableModels}");
+                }
+                else
+                {
+                    return (false, $"Error - Model '{DEFAULT_MODEL}' not found. Could not retrieve available models.");
+                }
+            }
             else
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
@@ -162,6 +175,118 @@ public class OpenAIPlugin : AIProviderPluginBase
         catch (Exception ex)
         {
             return (false, $"Error - {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Get available models from OpenAI API
+    /// </summary>
+    private async Task<string> GetAvailableModelsFromApiAsync()
+    {
+        try
+        {
+            // OpenAI has a models endpoint
+            var response = await _httpClient.GetAsync($"{API_BASE}/models");
+            if (!response.IsSuccessStatusCode)
+            {
+                // Fallback to testing common models
+                return await TestCommonModelsAsync();
+            }
+
+            var responseJson = await response.Content.ReadAsStringAsync();
+            var doc = JsonDocument.Parse(responseJson);
+
+            var chatModels = new List<string>();
+
+            if (doc.RootElement.TryGetProperty("data", out var dataArray))
+            {
+                foreach (var modelElement in dataArray.EnumerateArray())
+                {
+                    if (modelElement.TryGetProperty("id", out var idProp))
+                    {
+                        var modelId = idProp.GetString() ?? "";
+                        // Filter for chat completion models
+                        if (modelId.StartsWith("gpt-") &&
+                            (modelId.Contains("chat") || modelId.Contains("instruct") ||
+                             modelId == "gpt-4" || modelId == "gpt-4o" || modelId == "gpt-4-turbo" ||
+                             modelId.StartsWith("gpt-3.5") || modelId.StartsWith("gpt-4")))
+                        {
+                            chatModels.Add(modelId);
+                        }
+                    }
+                }
+            }
+
+            if (chatModels.Count > 0)
+            {
+                // Prioritize current models
+                var priorityModels = new[] { "gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo" };
+                var orderedModels = priorityModels.Where(m => chatModels.Contains(m))
+                                               .Concat(chatModels.Where(m => !priorityModels.Contains(m)));
+                return string.Join(", ", orderedModels.Take(10)); // Limit to 10 models
+            }
+
+            return "No chat models found";
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[OpenAIPlugin] Error getting models from API: {ex.Message}");
+            // Fallback to testing common models
+            return await TestCommonModelsAsync();
+        }
+    }
+
+    /// <summary>
+    /// Test common models as fallback
+    /// </summary>
+    private async Task<string> TestCommonModelsAsync()
+    {
+        try
+        {
+            var commonModels = new[]
+            {
+                "gpt-4o",
+                "gpt-4o-mini",
+                "gpt-4-turbo",
+                "gpt-4",
+                "gpt-3.5-turbo"
+            };
+
+            var workingModels = new List<string>();
+
+            foreach (var model in commonModels)
+            {
+                try
+                {
+                    var testBody = new
+                    {
+                        model = model,
+                        max_tokens = 5,
+                        messages = new[] { new { role = "user", content = "Hi" } }
+                    };
+
+                    var json = JsonSerializer.Serialize(testBody);
+                    var content = new StringContent(json, Encoding.UTF8, "application/json");
+                    var response = await _httpClient.PostAsync($"{API_BASE}/chat/completions", content);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        workingModels.Add(model);
+                        System.Diagnostics.Debug.WriteLine($"[OpenAIPlugin] Found working model: {model}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[OpenAIPlugin] Model {model} failed: {ex.Message}");
+                }
+            }
+
+            return workingModels.Count > 0 ? string.Join(", ", workingModels) : "No working models found";
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[OpenAIPlugin] Error testing common models: {ex.Message}");
+            return $"Error testing models: {ex.Message}";
         }
     }
 }

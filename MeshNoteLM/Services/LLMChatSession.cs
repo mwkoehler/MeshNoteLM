@@ -29,7 +29,7 @@ public class LLMChatSession
     /// <summary>
     /// All messages in the current conversation
     /// </summary>
-    public ObservableCollection<LLMChatMessage> Messages { get; } = new();
+    public ObservableCollection<LLMChatMessage> Messages { get; } = [];
 
     /// <summary>
     /// The currently selected file path (for context)
@@ -63,6 +63,11 @@ public class LLMChatSession
     /// Check if the chat session is properly configured (has either context file or direct chat file)
     /// </summary>
     public bool IsConfigured => !string.IsNullOrEmpty(_currentFilePath) || _isDirectChatFile;
+
+    /// <summary>
+    /// Get the current chat file path
+    /// </summary>
+    public string? ChatFilePath => _chatFilePath;
 
     /// <summary>
     /// Add a user message to the conversation

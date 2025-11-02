@@ -33,7 +33,7 @@ public class ClaudePlugin : AIProviderPluginBase
 {
     private const string API_BASE = "https://api.anthropic.com/v1";
     private const string API_VERSION = "2023-06-01";
-    private const string DEFAULT_MODEL = "claude-3-5-sonnet-20240620";
+    private const string DEFAULT_MODEL = "claude-3-opus-20240229";
 
     public override string Name => "Claude";
     public override string Version => "0.1";
@@ -119,9 +119,9 @@ public class ClaudePlugin : AIProviderPluginBase
 
     protected override IEnumerable<string> GetAvailableModels()
     {
-        yield return "claude-3-5-sonnet-20240620";
-        yield return "claude-3-5-haiku-20241022";
         yield return "claude-3-opus-20240229";
+        yield return "claude-3-5-haiku-20241022";
+        yield return "claude-3-haiku-20240307";
     }
 
     public override async Task<(bool Success, string Message)> TestConnectionAsync()
@@ -155,6 +155,19 @@ public class ClaudePlugin : AIProviderPluginBase
             {
                 return (false, "Invalid - Authentication failed");
             }
+            else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                // Model not found - try to get available models
+                var availableModels = await GetAvailableModelsFromApiAsync();
+                if (!string.IsNullOrEmpty(availableModels))
+                {
+                    return (false, $"Error - Model '{DEFAULT_MODEL}' not found. Available models: {availableModels}");
+                }
+                else
+                {
+                    return (false, $"Error - Model '{DEFAULT_MODEL}' not found. Could not retrieve available models.");
+                }
+            }
             else
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
@@ -164,6 +177,62 @@ public class ClaudePlugin : AIProviderPluginBase
         catch (Exception ex)
         {
             return (false, $"Error - {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Get available models from Anthropic API
+    /// </summary>
+    private async Task<string> GetAvailableModelsFromApiAsync()
+    {
+        try
+        {
+            // Anthropic doesn't have a public models endpoint, but we can try common working models
+            var commonModels = new[]
+            {
+                "claude-3-5-sonnet-20241022",
+                "claude-3-5-haiku-20241022",
+                "claude-3-sonnet-20240229",
+                "claude-3-haiku-20240307",
+                "claude-3-opus-20240229"
+            };
+
+            var workingModels = new List<string>();
+
+            // Test each model with a minimal request
+            foreach (var model in commonModels)
+            {
+                try
+                {
+                    var testBody = new
+                    {
+                        model = model,
+                        max_tokens = 5,
+                        messages = new[] { new { role = "user", content = "Hi" } }
+                    };
+
+                    var json = JsonSerializer.Serialize(testBody);
+                    var content = new StringContent(json, Encoding.UTF8, "application/json");
+                    var response = await _httpClient.PostAsync($"{API_BASE}/messages", content);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        workingModels.Add(model);
+                        System.Diagnostics.Debug.WriteLine($"[ClaudePlugin] Found working model: {model}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[ClaudePlugin] Model {model} failed: {ex.Message}");
+                }
+            }
+
+            return workingModels.Count > 0 ? string.Join(", ", workingModels) : "No working models found";
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ClaudePlugin] Error getting models: {ex.Message}");
+            return $"Error getting models: {ex.Message}";
         }
     }
 }

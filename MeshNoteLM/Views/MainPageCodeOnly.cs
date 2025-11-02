@@ -21,7 +21,7 @@ public partial class MainPageCodeOnly : ContentPage
                 BindingContext = vm;
 
         // Create the three-pane layout
-        _paneHost = new ThreePaneLayout();
+        _paneHost = [];
 
         // Pane A - Sources Tree View
         var sourcesTreeView = CreateSourcesTreeView();

@@ -91,8 +91,8 @@ public class RedditPlugin : PluginBase, IFileSystemPlugin
     private const string TOKEN_URL = "https://www.reddit.com/api/v1/access_token";
 
     // Caches
-    private readonly Dictionary<string, string> _contentCache = new();
-    private readonly List<string> _subredditCache = new();
+    private readonly Dictionary<string, string> _contentCache = [];
+    private readonly List<string> _subredditCache = [];
 
     public override string Name => "Reddit";
     public override string Version => "0.1";
@@ -416,7 +416,7 @@ public class RedditPlugin : PluginBase, IFileSystemPlugin
         }
         catch
         {
-            return new List<string>();
+            return [];
         }
     }
 
@@ -451,7 +451,7 @@ public class RedditPlugin : PluginBase, IFileSystemPlugin
         }
         catch
         {
-            return new List<string>();
+            return [];
         }
     }
 
@@ -528,7 +528,7 @@ public class RedditPlugin : PluginBase, IFileSystemPlugin
         }
         catch
         {
-            return new List<string>();
+            return [];
         }
     }
 
@@ -600,7 +600,7 @@ public class RedditPlugin : PluginBase, IFileSystemPlugin
         }
         catch
         {
-            return new List<string>();
+            return [];
         }
     }
 

@@ -42,7 +42,7 @@ namespace MeshNoteLM.ViewModels
 
             _pluginManager = pm!;
             // Initialize with empty collection - will be populated after plugins load via RefreshTree()
-            Nodes = new ObservableCollection<TreeNodeViewModel>();
+            Nodes = [];
             // Don't call RefreshTree() here - it will be called after plugins are loaded in App.OnStart()
 
             System.Diagnostics.Debug.WriteLine("=== SourcesTreeViewModel constructor END ===");

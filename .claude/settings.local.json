@@ -44,7 +44,8 @@
       "Bash(dotnet sln:*)",
       "Bash(dotnet add:*)",
       "Bash(dotnet test:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(claude:*)"
     ],
     "deny": [],
     "ask": []

@@ -75,8 +75,8 @@ public class NotionPlugin : PluginBase, IFileSystemPlugin
     private const string API_VERSION = "2022-06-28";
 
     // Caches
-    private readonly Dictionary<string, string> _pageCache = new();
-    private readonly Dictionary<string, List<string>> _databaseRowsCache = new();
+    private readonly Dictionary<string, string> _pageCache = [];
+    private readonly Dictionary<string, List<string>> _databaseRowsCache = [];
 
     public override string Name => "Notion";
     public override string Version => "0.1";
@@ -255,7 +255,7 @@ public class NotionPlugin : PluginBase, IFileSystemPlugin
     private async Task<List<string>> FetchDatabasesAsync()
     {
         if (string.IsNullOrEmpty(_apiKey))
-            return new List<string>();
+            return [];
 
         try
         {
@@ -283,7 +283,7 @@ public class NotionPlugin : PluginBase, IFileSystemPlugin
         }
         catch
         {
-            return new List<string>();
+            return [];
         }
     }
 
@@ -293,7 +293,7 @@ public class NotionPlugin : PluginBase, IFileSystemPlugin
             return cached;
 
         if (string.IsNullOrEmpty(_apiKey))
-            return new List<string>();
+            return [];
 
         try
         {
@@ -318,7 +318,7 @@ public class NotionPlugin : PluginBase, IFileSystemPlugin
         }
         catch
         {
-            return new List<string>();
+            return [];
         }
     }
 

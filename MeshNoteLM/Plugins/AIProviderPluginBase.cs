@@ -37,7 +37,7 @@ public abstract class AIProviderPluginBase : PluginBase, IFileSystemPlugin
 {
     protected readonly HttpClient _httpClient;
     protected readonly string _apiKey;
-    protected readonly Dictionary<string, List<Message>> _conversations = new();
+    protected readonly Dictionary<string, List<Message>> _conversations = [];
 
     protected class Message
     {
@@ -142,12 +142,12 @@ public abstract class AIProviderPluginBase : PluginBase, IFileSystemPlugin
             if (convId == "new")
             {
                 convId = Guid.NewGuid().ToString("N");
-                _conversations[convId] = new List<Message>();
+                _conversations[convId] = [];
             }
 
             if (!_conversations.ContainsKey(convId))
             {
-                _conversations[convId] = new List<Message>();
+                _conversations[convId] = [];
             }
 
             // Send to provider API and get response
@@ -215,7 +215,7 @@ public abstract class AIProviderPluginBase : PluginBase, IFileSystemPlugin
 
         if (type == PathType.ConversationDir && !_conversations.ContainsKey(convId))
         {
-            _conversations[convId] = new List<Message>();
+            _conversations[convId] = [];
         }
     }
 

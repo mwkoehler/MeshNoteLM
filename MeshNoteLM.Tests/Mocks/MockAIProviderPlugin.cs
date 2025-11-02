@@ -26,7 +26,7 @@ public class MockAIProviderPlugin : AIProviderPluginBase
     {
         _settingsApiKey = settingsApiKey;
         _environmentApiKey = environmentApiKey;
-        _availableModels = availableModels ?? new List<string> { "model-1", "model-2", "model-3" };
+        _availableModels = availableModels ?? ["model-1", "model-2", "model-3"];
     }
 
     public override string Name => "MockAI";

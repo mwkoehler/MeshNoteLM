@@ -23,8 +23,8 @@ public interface IFileSystemWrapper
 /// </summary>
 public class MockFileSystemWrapper : IFileSystemWrapper
 {
-    private readonly Dictionary<string, byte[]> _files = new();
-    private readonly HashSet<string> _directories = new();
+    private readonly Dictionary<string, byte[]> _files = [];
+    private readonly HashSet<string> _directories = [];
     private readonly string _appDataDirectory;
     private readonly string _cacheDirectory;
 

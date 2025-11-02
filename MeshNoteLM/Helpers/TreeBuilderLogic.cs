@@ -328,7 +328,7 @@ namespace MeshNoteLM.Helpers
             public int DirectoryCount { get; init; }
             public int FileCount { get; init; }
             public int PluginCount { get; init; }
-            public List<string> PluginNames { get; init; } = new();
+            public List<string> PluginNames { get; init; } = [];
         }
     }
 }

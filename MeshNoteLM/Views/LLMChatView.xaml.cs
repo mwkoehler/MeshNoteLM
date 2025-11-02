@@ -24,9 +24,9 @@ public partial class LLMChatView : ContentView
 {
     private readonly LLMChatSession _chatSession;
     private readonly PluginManager _pluginManager;
-    private readonly List<AIProviderPluginBase> _selectedLLMs = new();
-    private readonly Dictionary<Button, AIProviderPluginBase> _llmButtonMap = new();
-    private readonly Dictionary<string, Color> _llmColors = new();
+    private readonly List<AIProviderPluginBase> _selectedLLMs = [];
+    private readonly Dictionary<Button, AIProviderPluginBase> _llmButtonMap = [];
+    private readonly Dictionary<string, Color> _llmColors = [];
 
     public LLMChatView()
     {
@@ -43,9 +43,34 @@ public partial class LLMChatView : ContentView
         _chatSession.Messages.CollectionChanged += (s, e) => RefreshMessageDisplay();
 
         // Hook into Loaded event to ensure plugins are available
-        this.Loaded += (s, e) => SelectDefaultLLM();
+        this.Loaded += (s, e) =>
+        {
+            SelectDefaultLLM();
+            SetupKeyboardHandlers();
+        };
     }
 
+    /// <summary>
+    /// Handle Enter key press in Editor
+    /// </summary>
+    private void OnMessageInputCompleted(object sender, EventArgs e)
+    {
+        // Enter key was pressed - send the message
+        _ = SendMessage();
+    }
+
+    /// <summary>
+    /// Setup keyboard handlers for keyboard shortcuts
+    /// </summary>
+    private static void SetupKeyboardHandlers()
+    {
+        // The Completed event on the Editor will handle Enter key
+        // Shift+Enter will create a new line (default Editor behavior)
+
+        System.Diagnostics.Debug.WriteLine("[LLMChatView] Keyboard setup: Enter to send, Shift+Enter for new line");
+    }
+
+    
     /// <summary>
     /// Initialize color mappings for different LLM providers
     /// </summary>
@@ -101,6 +126,8 @@ public partial class LLMChatView : ContentView
         var validProviders = enabledProviders.Where(p => p.HasValidAuthorization()).ToList();
         System.Diagnostics.Debug.WriteLine($"[LLMChatView] Valid AI providers (with API keys): {validProviders.Count}");
 
+        // Clear existing selections and add new ones
+        _selectedLLMs.Clear();
         _selectedLLMs.AddRange(validProviders);
         if (_selectedLLMs.Count > 0)
         {
@@ -158,10 +185,10 @@ public partial class LLMChatView : ContentView
             var button = new Button
             {
                 Text = llm.Name,
-                Padding = new Thickness(10, 5),
-                FontSize = 12,
-                WidthRequest = 80,
-                HeightRequest = 30
+                Padding = new Thickness(8, 4),
+                FontSize = 11,
+                HeightRequest = 28,
+                MinimumWidthRequest = 60
             };
 
             button.Clicked += (s, e) => SelectLLM(llm);
@@ -178,11 +205,7 @@ public partial class LLMChatView : ContentView
     /// </summary>
     private void SelectLLM(AIProviderPluginBase llm)
     {
-        if (_selectedLLMs.Contains(llm))
-        {
-            _selectedLLMs.Remove(llm);
-        }
-        else
+        if (!_selectedLLMs.Remove(llm))
         {
             _selectedLLMs.Add(llm);
         }
@@ -197,6 +220,15 @@ public partial class LLMChatView : ContentView
     /// Handle send button click
     /// </summary>
     private async void OnSendClicked(object sender, EventArgs e)
+    {
+        await SendMessage();
+    }
+
+    
+    /// <summary>
+    /// Send message common logic
+    /// </summary>
+    private async Task SendMessage()
     {
         var userMessage = MessageInput.Text?.Trim();
         if (string.IsNullOrEmpty(userMessage))
@@ -243,7 +275,7 @@ public partial class LLMChatView : ContentView
     }
 
     /// <summary>
-    /// Send message to all selected LLMs
+    /// Send message to all selected LLMs or a specific LLM if prefixed with "LLM Name:"
     /// </summary>
     private async Task SendMessageToLLM(string userMessage)
     {
@@ -252,6 +284,9 @@ public partial class LLMChatView : ContentView
 
         try
         {
+            // Check if message is directed to a specific LLM
+            var targetedLLMs = ParseLLMTargeting(userMessage, out var actualMessage);
+
             // Build conversation history with file context
             var history = new List<(string Role, string Content)>();
 
@@ -278,12 +313,12 @@ public partial class LLMChatView : ContentView
                 history.Add((msg.Role, msg.Content));
             }
 
-            // Send message to all selected LLMs in parallel
-            var tasks = _selectedLLMs.Select(async llm =>
+            // Send message to targeted LLMs in parallel
+            var tasks = targetedLLMs.Select(async llm =>
             {
                 try
                 {
-                    var response = await llm.SendChatMessageAsync(history, userMessage);
+                    var response = await llm.SendChatMessageAsync(history, actualMessage);
                     _chatSession.AddAssistantMessage(response, llm.Name);
                 }
                 catch (Exception ex)
@@ -301,6 +336,49 @@ public partial class LLMChatView : ContentView
             _chatSession.AddErrorMessage(ex.Message, llmNames);
             await HandleLLMError(ex);
         }
+    }
+
+    /// <summary>
+    /// Parse message to check if it's directed to a specific LLM
+    /// Format: "LLM Name: message"
+    /// Returns the list of LLMs to send the message to and the actual message (without LLM prefix)
+    /// </summary>
+    private List<AIProviderPluginBase> ParseLLMTargeting(string userMessage, out string actualMessage)
+    {
+        actualMessage = userMessage;
+
+        // Check for LLM targeting pattern: "LLM Name: message"
+        var colonIndex = userMessage.IndexOf(':');
+        if (colonIndex > 0) // Must have content before colon
+        {
+            var targetLLMName = userMessage[..colonIndex].Trim();
+            actualMessage = userMessage[(colonIndex + 1)..].Trim();
+
+            // Find the targeted LLM among all available plugins
+            var allLLMs = _pluginManager.GetAllPlugins()
+                .OfType<AIProviderPluginBase>()
+                .Where(p => p.IsEnabled && p.HasValidAuthorization())
+                .ToList();
+
+            // Try exact match first, then case-insensitive match
+            var targetedLLM = allLLMs.FirstOrDefault(llm =>
+                llm.Name.Equals(targetLLMName, StringComparison.OrdinalIgnoreCase));
+
+            if (targetedLLM != null)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LLMChatView] Message directed to specific LLM: {targetedLLM.Name}");
+                return [targetedLLM];
+            }
+            else
+            {
+                // LLM not found or not enabled, restore original message and use selected LLMs
+                System.Diagnostics.Debug.WriteLine($"[LLMChatView] Targeted LLM '{targetLLMName}' not found or not enabled, using selected LLMs");
+                actualMessage = userMessage; // Restore original message
+            }
+        }
+
+        // No specific targeting, use selected LLMs
+        return [.. _selectedLLMs];
     }
 
     /// <summary>
@@ -359,7 +437,7 @@ public partial class LLMChatView : ContentView
     /// <summary>
     /// Prompt user for save location if no file is selected
     /// </summary>
-    private async Task<string?> PromptForSaveLocation()
+    private static async Task<string?> PromptForSaveLocation()
     {
         // Get platform-specific Documents folder
         var documentsFolder = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
@@ -423,18 +501,131 @@ public partial class LLMChatView : ContentView
     {
         MessagesContainer.Children.Clear();
 
+        // Add chat file link if chat is configured
+        if (_chatSession.IsConfigured && !string.IsNullOrEmpty(_chatSession.ChatFilePath))
+        {
+            var fileLinkView = CreateChatFileLinkView(_chatSession.ChatFilePath);
+            MessagesContainer.Children.Add(fileLinkView);
+        }
+
         foreach (var message in _chatSession.Messages)
         {
             var messageView = CreateMessageView(message);
             MessagesContainer.Children.Add(messageView);
         }
 
-        // Scroll to bottom
+        // Debug scroll information
+        System.Diagnostics.Debug.WriteLine($"[LLMChatView] Messages count: {_chatSession.Messages.Count}");
+        System.Diagnostics.Debug.WriteLine($"[LLMChatView] ScrollView content height: {ChatScrollView.Content?.Height ?? 0}");
+
+        // Scroll to bottom with more reliable method
         MainThread.BeginInvokeOnMainThread(async () =>
         {
-            await Task.Delay(100); // Give UI time to render
-            await ChatScrollView.ScrollToAsync(0, ChatScrollView.Content.Height, false);
+            await Task.Delay(150); // Give UI more time to render
+
+            try
+            {
+                // Force layout update
+                this.InvalidateMeasure();
+                await Task.Delay(50);
+
+                // Multiple scroll attempts for reliability
+                await ChatScrollView.ScrollToAsync(ChatScrollView, ScrollToPosition.End, animated: false);
+                await Task.Delay(25);
+
+                // Alternative scroll method
+                if (ChatScrollView.Content != null)
+                {
+                    await ChatScrollView.ScrollToAsync(0, ChatScrollView.Content.Height, animated: false);
+                }
+
+                System.Diagnostics.Debug.WriteLine($"[LLMChatView] Scrolled to bottom. ScrollView height: {ChatScrollView.Height}, Content height: {ChatScrollView.Content?.Height ?? 0}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LLMChatView] Error scrolling to bottom: {ex.Message}");
+            }
         });
+    }
+
+    /// <summary>
+    /// Create a view for the chat file link
+    /// </summary>
+    private static Border CreateChatFileLinkView(string chatFilePath)
+    {
+        var border = new Border
+        {
+            Padding = 8,
+            Margin = new Thickness(0, 5),
+            StrokeShape = new RoundRectangle { CornerRadius = 6 },
+            Stroke = Color.FromArgb("#DDDDDD"),
+            BackgroundColor = Color.FromArgb("#F5F5F5")
+        };
+
+        var stack = new HorizontalStackLayout
+        {
+            Spacing = 8,
+            VerticalOptions = LayoutOptions.Center
+        };
+
+        var fileIcon = new Label
+        {
+            Text = "📄",
+            FontSize = 14,
+            VerticalOptions = LayoutOptions.Center
+        };
+
+        var linkLabel = new Label
+        {
+            Text = $"Chat file: {System.IO.Path.GetFileName(chatFilePath)}",
+            FontSize = 12,
+            TextColor = Colors.Blue,
+            VerticalOptions = LayoutOptions.Center,
+            GestureRecognizers =
+            {
+                new TapGestureRecognizer
+                {
+                    Command = new Command(async () => await OpenChatFile(chatFilePath))
+                }
+            }
+        };
+
+        var pathLabel = new Label
+        {
+            Text = chatFilePath,
+            FontSize = 10,
+            TextColor = Colors.Gray,
+            VerticalOptions = LayoutOptions.Center
+        };
+
+        stack.Children.Add(fileIcon);
+        stack.Children.Add(linkLabel);
+        stack.Children.Add(pathLabel);
+
+        border.Content = stack;
+        return border;
+    }
+
+    /// <summary>
+    /// Open the chat file
+    /// </summary>
+    private static async Task OpenChatFile(string chatFilePath)
+    {
+        try
+        {
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] Opening chat file: {chatFilePath}");
+
+            // Try to open with default application
+            await Launcher.Default.OpenAsync(new OpenFileRequest
+            {
+                File = new ReadOnlyFile(chatFilePath)
+            });
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] Error opening chat file: {ex.Message}");
+            await DisplayAlert("Error", $"Could not open file: {ex.Message}", "OK");
+        }
     }
 
     /// <summary>
@@ -464,12 +655,13 @@ public partial class LLMChatView : ContentView
             var llmNames = _selectedLLMs.Count > 0
                 ? string.Join(", ", _selectedLLMs.Select(llm => llm.Name))
                 : "LLM";
-            header.Text = $"You -> {llmNames} - {message.Timestamp:HH:mm:ss}";
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] User message header LLMs: {llmNames} (Count: {_selectedLLMs.Count})");
+            header.Text = $"You -> {llmNames} - {message.Timestamp:MM/dd/yyyy HH:mm:ss}";
             border.BackgroundColor = Color.FromArgb("#E3F2FD");
         }
         else if (message.IsError)
         {
-            header.Text = $"{message.LLMProvider ?? "LLM"} Error - {message.Timestamp:HH:mm:ss}";
+            header.Text = $"{message.LLMProvider ?? "LLM"} Error - {message.Timestamp:MM/dd/yyyy HH:mm:ss}";
             // Use a light red background for errors, but still try to get LLM-specific color
             var llmProvider = message.LLMProvider ?? "";
             if (_llmColors.TryGetValue(llmProvider, out var errorColor))
@@ -484,7 +676,7 @@ public partial class LLMChatView : ContentView
         }
         else
         {
-            header.Text = $"{message.LLMProvider ?? "LLM"} replied - {message.Timestamp:HH:mm:ss}";
+            header.Text = $"{message.LLMProvider ?? "LLM"} replied - {message.Timestamp:MM/dd/yyyy HH:mm:ss}";
             // Use LLM-specific color for normal responses
             var llmProvider = message.LLMProvider ?? "";
             if (_llmColors.TryGetValue(llmProvider, out var llmColor))
@@ -516,7 +708,7 @@ public partial class LLMChatView : ContentView
     /// <summary>
     /// Helper to display alerts
     /// </summary>
-    private Task DisplayAlert(string title, string message, string cancel)
+    private static Task DisplayAlert(string title, string message, string cancel)
     {
         var page = Application.Current?.Windows[0]?.Page;
         if (page != null)
@@ -529,7 +721,7 @@ public partial class LLMChatView : ContentView
     /// <summary>
     /// Helper to display action sheets
     /// </summary>
-    private Task<string> DisplayActionSheet(string title, string cancel, string? destruction, params string[] buttons)
+    private static Task<string> DisplayActionSheet(string title, string cancel, string? destruction, params string[] buttons)
     {
         var page = Application.Current?.Windows[0]?.Page;
         if (page != null)
@@ -542,7 +734,7 @@ public partial class LLMChatView : ContentView
     /// <summary>
     /// Helper to display prompts
     /// </summary>
-    private Task<string> DisplayPromptAsync(string title, string message, string accept, string cancel, string placeholder)
+    private static Task<string> DisplayPromptAsync(string title, string message, string accept, string cancel, string placeholder)
     {
         var page = Application.Current?.Windows[0]?.Page;
         if (page != null)

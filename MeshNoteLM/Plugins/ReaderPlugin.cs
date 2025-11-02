@@ -72,7 +72,7 @@ public class ReaderPlugin : PluginBase, IFileSystemPlugin
     private const string API_BASE = "https://readwise.io/api/v3";
 
     // Cache
-    private readonly Dictionary<string, string> _documentCache = new();
+    private readonly Dictionary<string, string> _documentCache = [];
 
     public override string Name => "Readwise Reader";
     public override string Version => "0.1";
@@ -322,7 +322,7 @@ public class ReaderPlugin : PluginBase, IFileSystemPlugin
     private async Task<List<string>> ListDocumentsAsync()
     {
         if (string.IsNullOrEmpty(_token))
-            return new List<string>();
+            return [];
 
         try
         {
@@ -346,7 +346,7 @@ public class ReaderPlugin : PluginBase, IFileSystemPlugin
         }
         catch
         {
-            return new List<string>();
+            return [];
         }
     }
 
