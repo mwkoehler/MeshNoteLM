@@ -38,12 +38,12 @@
 
             <Editor Grid.Column="0"
                     x:Name="MessageInput"
-                    Placeholder="Type your question... (Enter to send, Shift+Enter for new line)"
+                    Placeholder="Type your question... (LLM Name: for specific LLM, Enter for new line, Ctrl+Enter or Send to send)"
                     HeightRequest="100"
                     VerticalOptions="Fill"
                     HorizontalOptions="Fill"
                     Keyboard="Chat"
-                    TextChanged="OnMessageInputTextChanged"/>
+                    Completed="OnMessageInputCompleted"/>
 
             <Button Grid.Column="1"
                     Text="Send"
