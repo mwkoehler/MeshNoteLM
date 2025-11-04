@@ -12,9 +12,10 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.Maui.Controls;
-using Microsoft.Maui.Controls.Shapes;
+using Microsoft.Maui.Storage;
 using MeshNoteLM.Services;
 using MeshNoteLM.Models;
 using MeshNoteLM.Plugins;
@@ -129,7 +130,7 @@ public partial class LLMChatView : ContentView
     /// <summary>
     /// macOS-specific keyboard handling
     /// </summary>
-    private void SetupMacKeyboardHandlers()
+    private static void SetupMacKeyboardHandlers()
     {
         // Enhanced macOS keyboard handling
         try
@@ -300,6 +301,14 @@ public partial class LLMChatView : ContentView
         await SendMessage();
     }
 
+    /// <summary>
+    /// Handle Load Chat button click
+    /// </summary>
+    private async void OnLoadChatClicked(object sender, EventArgs e)
+    {
+        await LoadChatLogFile();
+    }
+
     
     /// <summary>
     /// Send message common logic
@@ -427,8 +436,8 @@ public partial class LLMChatView : ContentView
         var colonIndex = userMessage.IndexOf(':');
         if (colonIndex > 0) // Must have content before colon
         {
-            var targetLLMName = userMessage.Substring(0, colonIndex).Trim();
-            actualMessage = userMessage.Substring(colonIndex + 1).Trim();
+            var targetLLMName = userMessage[..colonIndex].Trim();
+            actualMessage = userMessage[(colonIndex + 1)..].Trim();
 
             System.Diagnostics.Debug.WriteLine($"[LLMChatView] LLM targeting detected: '{targetLLMName}' -> '{actualMessage}'");
 
@@ -447,7 +456,7 @@ public partial class LLMChatView : ContentView
             if (targetedLLM != null)
             {
                 System.Diagnostics.Debug.WriteLine($"[LLMChatView] Message directed to specific LLM: {targetedLLM.Name}");
-                return new List<AIProviderPluginBase> { targetedLLM };
+                return [targetedLLM];
             }
             else
             {
@@ -462,7 +471,7 @@ public partial class LLMChatView : ContentView
         }
 
         // No specific targeting, use selected LLMs
-        return new List<AIProviderPluginBase>(_selectedLLMs);
+        return [.. _selectedLLMs];
     }
 
     /// <summary>
@@ -641,7 +650,7 @@ public partial class LLMChatView : ContentView
         {
             Padding = 8,
             Margin = new Thickness(0, 5),
-            StrokeShape = new RoundRectangle { CornerRadius = 6 },
+            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 6 },
             Stroke = Color.FromArgb("#DDDDDD"),
             BackgroundColor = Color.FromArgb("#F5F5F5")
         };
@@ -721,7 +730,7 @@ public partial class LLMChatView : ContentView
         {
             Padding = 10,
             Margin = new Thickness(0, 5),
-            StrokeShape = new RoundRectangle { CornerRadius = 8 },
+            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle { CornerRadius = 8 },
             Stroke = Colors.Transparent
         };
 
@@ -826,5 +835,302 @@ public partial class LLMChatView : ContentView
             return page.DisplayPromptAsync(title, message, accept, cancel, placeholder);
         }
         return Task.FromResult(string.Empty);
+    }
+
+    /// <summary>
+    /// Load an existing chat log file
+    /// </summary>
+    private async Task LoadChatLogFile()
+    {
+        try
+        {
+            System.Diagnostics.Debug.WriteLine("[LLMChatView] Loading chat log file...");
+
+            var result = await FilePicker.Default.PickAsync(new PickOptions
+            {
+                PickerTitle = "Select Chat Log File"
+            });
+
+            if (result != null)
+            {
+                // Validate file extension
+                var validExtensions = new[] { ".chat.md", ".md", ".txt" };
+                var fileExtension = System.IO.Path.GetExtension(result.FullPath).ToLowerInvariant();
+
+                if (!validExtensions.Contains(fileExtension))
+                {
+                    await DisplayAlert("Invalid File Type", "Please select a chat file (.chat.md, .md, or .txt)", "OK");
+                    return;
+                }
+
+                await ProcessChatLogFile(result.FullPath);
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine("[LLMChatView] No file selected");
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] Error loading chat file: {ex.Message}");
+            await DisplayAlert("Error", $"Could not load chat file: {ex.Message}", "OK");
+        }
+    }
+
+    /// <summary>
+    /// Process the selected chat log file
+    /// </summary>
+    private async Task ProcessChatLogFile(string filePath)
+    {
+        try
+        {
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] Processing chat file: {filePath}");
+
+            // Read the file content
+            var fileContent = await File.ReadAllTextAsync(filePath);
+
+            if (string.IsNullOrWhiteSpace(fileContent))
+            {
+                await DisplayAlert("Empty File", "The selected file is empty.", "OK");
+                return;
+            }
+
+            // Parse the chat log
+            var chatMessages = ParseChatLog(fileContent);
+
+            if (chatMessages.Count == 0)
+            {
+                await DisplayAlert("Invalid Format", "No valid chat messages found in the file.", "OK");
+                return;
+            }
+
+            // Look for related context file
+            var contextFile = FindRelatedContextFile(filePath);
+
+            // Clear current chat session and load new messages
+            _chatSession.ClearConversation();
+
+            // Set chat file path for saving new messages
+            _chatSession.SetChatFilePath(filePath);
+
+            // If context file found, load it
+            if (contextFile != null)
+            {
+                var contextContent = await File.ReadAllTextAsync(contextFile);
+                SetFileContext(contextFile, contextContent);
+                System.Diagnostics.Debug.WriteLine($"[LLMChatView] Loaded context file: {contextFile}");
+            }
+
+            // Load parsed messages into chat session
+            foreach (var message in chatMessages)
+            {
+                if (message.Role == "user")
+                {
+                    _chatSession.AddUserMessage(message.Content);
+                }
+                else if (message.Role == "assistant")
+                {
+                    _chatSession.AddAssistantMessage(message.Content, message.LLMProvider ?? "Unknown");
+                }
+                else if (message.IsError)
+                {
+                    _chatSession.AddErrorMessage(message.Content, message.LLMProvider ?? "Unknown");
+                }
+            }
+
+            // Refresh display
+            RefreshMessageDisplay();
+
+            var successMessage = $"Loaded {chatMessages.Count} messages from chat log";
+            if (contextFile != null)
+            {
+                successMessage += $" with context file: {System.IO.Path.GetFileName(contextFile)}";
+            }
+
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] {successMessage}");
+
+            // Focus the input for new messages
+            MessageInput.Focus();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] Error processing chat file: {ex.Message}");
+            await DisplayAlert("Processing Error", $"Could not process chat file: {ex.Message}", "OK");
+        }
+    }
+
+    /// <summary>
+    /// Parse chat log content into messages
+    /// </summary>
+    private static List<LLMChatMessage> ParseChatLog(string content)
+    {
+        var messages = new List<LLMChatMessage>();
+
+        try
+        {
+            // Common patterns for chat log formats
+            var patterns = new[]
+            {
+                // Format: "YYYY-MM-DD HH:mm:ss - User: message"
+                @"^(?<timestamp>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\s*-\s*(?<role>[^:]+):\s*(?<content>.*)$",
+                // Format: "[User] message"
+                @"^\[(?<role>[^\]]+)\]\s*(?<content>.*)$",
+                // Format: "User: message" (simple)
+                @"^(?<role>[^:]+):\s*(?<content>.*)$"
+            };
+
+            var lines = content.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            string currentRole = "unknown";
+            string currentContent = "";
+            DateTime currentTimestamp = DateTime.Now;
+
+            foreach (var line in lines)
+            {
+                var trimmedLine = line.Trim();
+                if (string.IsNullOrEmpty(trimmedLine)) continue;
+
+                bool matched = false;
+
+                foreach (var pattern in patterns)
+                {
+                    var match = Regex.Match(trimmedLine, pattern);
+                    if (match.Success)
+                    {
+                        // Save previous message if exists
+                        if (!string.IsNullOrEmpty(currentContent.Trim()))
+                        {
+                            var message = new LLMChatMessage
+                            {
+                                Role = currentRole.ToLower(),
+                                Content = currentContent.Trim(),
+                                Timestamp = currentTimestamp,
+                                ErrorMessage = currentRole.ToLower().Contains("error") ? currentContent.Trim() : null
+                            };
+                            messages.Add(message);
+                        }
+
+                        // Start new message
+                        currentRole = match.Groups["role"].Value;
+                        currentContent = match.Groups["content"].Value;
+
+                        // Try to parse timestamp
+                        if (match.Groups.ContainsKey("timestamp") && DateTime.TryParse(match.Groups["timestamp"].Value, out var ts))
+                        {
+                            currentTimestamp = ts;
+                        }
+                        else
+                        {
+                            currentTimestamp = DateTime.Now;
+                        }
+
+                        matched = true;
+                        break;
+                    }
+                }
+
+                if (!matched)
+                {
+                    // Continuation of current message
+                    currentContent += "\n" + trimmedLine;
+                }
+            }
+
+            // Add the last message
+            if (!string.IsNullOrEmpty(currentContent.Trim()))
+            {
+                var message = new LLMChatMessage
+                {
+                    Role = currentRole.ToLower(),
+                    Content = currentContent.Trim(),
+                    Timestamp = currentTimestamp,
+                    ErrorMessage = currentRole.ToLower().Contains("error") ? currentContent.Trim() : null
+                };
+                messages.Add(message);
+            }
+
+            // Normalize roles
+            foreach (var message in messages)
+            {
+                if (message.Role.Contains("user", StringComparison.OrdinalIgnoreCase) ||
+                    message.Role.Contains("you", StringComparison.OrdinalIgnoreCase) ||
+                    message.Role.Contains("human", StringComparison.OrdinalIgnoreCase))
+                {
+                    message.Role = "user";
+                }
+                else if (message.Role.Contains("assistant", StringComparison.OrdinalIgnoreCase) ||
+                         message.Role.Contains("ai", StringComparison.OrdinalIgnoreCase) ||
+                         message.Role.Contains("bot", StringComparison.OrdinalIgnoreCase) ||
+                         message.Role.Contains("llm", StringComparison.OrdinalIgnoreCase))
+                {
+                    message.Role = "assistant";
+                }
+                else if (message.Role.Contains("system", StringComparison.OrdinalIgnoreCase))
+                {
+                    message.Role = "system";
+                }
+            }
+
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] Parsed {messages.Count} messages from chat log");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] Error parsing chat log: {ex.Message}");
+        }
+
+        return messages;
+    }
+
+    /// <summary>
+    /// Find a related context file for the chat log
+    /// </summary>
+    private static string? FindRelatedContextFile(string chatFilePath)
+    {
+        try
+        {
+            var chatDir = System.IO.Path.GetDirectoryName(chatFilePath);
+            var chatFileName = System.IO.Path.GetFileNameWithoutExtension(chatFilePath);
+
+            // Look for files with similar names
+            var possibleNames = new[]
+            {
+                chatFileName,
+                chatFileName.Replace(".chat", ""),
+                chatFileName.Replace("_chat", ""),
+                chatFileName.Replace("-chat", ""),
+                System.IO.Path.GetFileNameWithoutExtension(chatFilePath)
+            };
+
+            var possibleExtensions = new[] { ".txt", ".md", ".cs", ".js", ".py", ".java", ".cpp", ".h", ".html", ".css" };
+
+            foreach (var name in possibleNames)
+            {
+                foreach (var ext in possibleExtensions)
+                {
+                    var possibleFile = System.IO.Path.Combine(chatDir!, name + ext);
+                    if (File.Exists(possibleFile) && possibleFile != chatFilePath)
+                    {
+                        // Check if it's not a chat file
+                        if (!possibleFile.EndsWith(".chat.md", StringComparison.OrdinalIgnoreCase) && !possibleFile.EndsWith(".chat", StringComparison.OrdinalIgnoreCase))
+                        {
+                            return possibleFile;
+                        }
+                    }
+                }
+            }
+
+            // Look for any non-chat file in the directory with matching name pattern
+            var files = Directory.GetFiles(chatDir!)
+                .Where(f => !f.EndsWith(".chat.md", StringComparison.OrdinalIgnoreCase) && !f.EndsWith(".chat", StringComparison.OrdinalIgnoreCase))
+                .Where(f => System.IO.Path.GetFileNameWithoutExtension(f)
+                    .Contains(chatFileName.Replace(".chat", "").Replace("_chat", "").Replace("-chat", ""), StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            return files.FirstOrDefault();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] Error finding context file: {ex.Message}");
+            return null;
+        }
     }
 }
