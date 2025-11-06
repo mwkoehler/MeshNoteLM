@@ -36,7 +36,7 @@
             </Grid>
 
             <!-- Buttons Row -->
-            <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto" VerticalOptions="Start" ColumnSpacing="8">
+            <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto,Auto" VerticalOptions="Start" ColumnSpacing="8">
                 <!-- Load Chat Button -->
                 <Button Grid.Column="1"
                         x:Name="LoadChatButton"
@@ -50,8 +50,21 @@
                         MinimumWidthRequest="70"
                         VerticalOptions="Start"/>
 
+                <!-- Rename/Move Chat Button -->
+                <Button Grid.Column="2"
+                        x:Name="RenameMoveChatButton"
+                        Text="Rename/Move"
+                        Clicked="OnRenameMoveChatClicked"
+                        BackgroundColor="#17A2B8"
+                        TextColor="White"
+                        FontSize="11"
+                        HeightRequest="24"
+                        Padding="8,4"
+                        MinimumWidthRequest="80"
+                        VerticalOptions="Start"/>
+
                 <!-- HorizontalStackLayout for LLM buttons -->
-                <HorizontalStackLayout Grid.Column="2" x:Name="LLMButtonsStack" Spacing="2" VerticalOptions="Start">
+                <HorizontalStackLayout Grid.Column="3" x:Name="LLMButtonsStack" Spacing="2" VerticalOptions="Start">
                     <!-- LLM buttons will be added programmatically -->
                 </HorizontalStackLayout>
             </Grid>

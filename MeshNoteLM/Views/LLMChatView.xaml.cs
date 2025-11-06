@@ -522,6 +522,14 @@ public partial class LLMChatView : ContentView
         await LoadChatLogFile();
     }
 
+    /// <summary>
+    /// Handle Rename/Move Chat button click
+    /// </summary>
+    private async void OnRenameMoveChatClicked(object sender, EventArgs e)
+    {
+        await RenameMoveChatFile();
+    }
+
     
     /// <summary>
     /// Send message common logic
@@ -537,17 +545,18 @@ public partial class LLMChatView : ContentView
 
         if (!_chatSession.IsConfigured)
         {
-            System.Diagnostics.Debug.WriteLine($"[LLMChatView] Chat not configured, prompting for save location");
-            var savePath = await PromptForSaveLocation();
-            System.Diagnostics.Debug.WriteLine($"[LLMChatView] PromptForSaveLocation returned: '{savePath}' (length: {savePath?.Length ?? 0})");
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] Chat not configured, auto-creating chat file");
+            var savePath = AutoCreateUniqueChatFile();
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] AutoCreateUniqueChatFile returned: '{savePath}' (length: {savePath?.Length ?? 0})");
 
             if (string.IsNullOrEmpty(savePath))
             {
-                System.Diagnostics.Debug.WriteLine($"[LLMChatView] User cancelled save location prompt or empty path returned");
+                System.Diagnostics.Debug.WriteLine($"[LLMChatView] Failed to auto-create chat file");
+                await DisplayAlert("Error", "Could not create chat file. Please try again.", "OK");
                 return;
             }
 
-            System.Diagnostics.Debug.WriteLine($"[LLMChatView] User selected save path: '{savePath}'");
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] Auto-created chat file: '{savePath}'");
             // For direct chat files (no context file), set the chat file path directly
             _chatSession.SetChatFilePath(savePath);
             System.Diagnostics.Debug.WriteLine($"[LLMChatView] After SetChatFilePath - IsConfigured: '{_chatSession.IsConfigured}'");
@@ -780,7 +789,80 @@ public partial class LLMChatView : ContentView
     }
 
     /// <summary>
-    /// Prompt user for save location if no file is selected
+    /// Auto-create a unique chat file in the local filesystem
+    /// </summary>
+    private static string? AutoCreateUniqueChatFile()
+    {
+        try
+        {
+            // Prefer AppDataDirectory for app-specific files, fallback to Documents
+            var baseFolder = FileSystem.AppDataDirectory;
+            if (string.IsNullOrEmpty(baseFolder))
+            {
+                baseFolder = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            }
+
+            // If still no valid folder, use current directory as last resort
+            if (string.IsNullOrEmpty(baseFolder))
+            {
+                baseFolder = Directory.GetCurrentDirectory();
+            }
+
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] AutoCreateUniqueChatFile - Base folder: '{baseFolder}'");
+
+            // Create base filename with current date-time including tenths of a second
+            var baseFileName = $"Chat_{DateTime.Now:yyyy-MM-dd_HH-mm-ss.f}.chat.md";
+
+            // Generate unique filename (with tenths of second increments if needed)
+            var uniquePath = GenerateUniqueFileName(baseFolder, baseFileName);
+
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] AutoCreateUniqueChatFile - Created unique path: '{uniquePath}'");
+            return uniquePath;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] Error auto-creating chat file: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Generate a unique filename by retrying with increasing tenths of a second
+    /// </summary>
+    private static string GenerateUniqueFileName(string folder, string baseFileName)
+    {
+        var basePath = System.IO.Path.Combine(folder, baseFileName);
+
+        // If the base filename doesn't exist, use it
+        if (!File.Exists(basePath))
+        {
+            return basePath;
+        }
+
+        // Extract the full extension (.chat.md) and base name pattern
+        var extension = ".chat.md"; // We always use this extension for chat files
+        var baseNameOnly = "Chat"; // Base name without timestamp
+
+        // Retry with increasing tenths of a second
+        var tenths = 1;
+        string uniquePath;
+
+        do
+        {
+            // Generate new timestamp with additional tenths
+            var newTimestamp = DateTime.Now.AddMilliseconds(tenths * 100).ToString("yyyy-MM-dd_HH-mm-ss.f");
+            var uniqueName = $"{baseNameOnly}_{newTimestamp}{extension}";
+            uniquePath = System.IO.Path.Combine(folder, uniqueName);
+            tenths++;
+        }
+        while (File.Exists(uniquePath) && tenths < 100); // Prevent infinite loop (up to 10 seconds of retries)
+
+        System.Diagnostics.Debug.WriteLine($"[LLMChatView] GenerateUniqueFileName - Base: '{baseFileName}', Unique: '{uniquePath}'");
+        return uniquePath;
+    }
+
+    /// <summary>
+    /// Prompt user for save location if no file is selected (kept for backward compatibility)
     /// </summary>
     private static async Task<string?> PromptForSaveLocation()
     {
@@ -1410,6 +1492,198 @@ public partial class LLMChatView : ContentView
         {
             System.Diagnostics.Debug.WriteLine($"[LLMChatView] Error loading chat file: {ex.Message}");
             await DisplayAlert("Error", $"Could not load chat file: {ex.Message}", "OK");
+        }
+    }
+
+    /// <summary>
+    /// Rename or move the current chat file
+    /// </summary>
+    private async Task RenameMoveChatFile()
+    {
+        try
+        {
+            // Check if we have a chat file to rename/move
+            if (!_chatSession.IsConfigured || string.IsNullOrEmpty(_chatSession.ChatFilePath))
+            {
+                await DisplayAlert("No Chat File", "No chat file is currently open. Start a chat first.", "OK");
+                return;
+            }
+
+            var currentChatPath = _chatSession.ChatFilePath;
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] RenameMoveChatFile - Current path: '{currentChatPath}'");
+
+            // Check if the current chat file exists on the filesystem (only show option for real files)
+            var isRealFile = File.Exists(currentChatPath);
+            if (!isRealFile)
+            {
+                await DisplayAlert("Cannot Rename", "This chat file is stored in a virtual location and cannot be renamed or moved.", "OK");
+                return;
+            }
+
+            var currentFileName = Path.GetFileName(currentChatPath);
+            var currentDirectory = Path.GetDirectoryName(currentChatPath);
+
+            // Show dialog for new filename
+            var newFileName = await DisplayPromptAsync(
+                "Rename/Move Chat",
+                "Enter new file name or path:",
+                "Save",
+                "Cancel",
+                currentFileName
+            );
+
+            if (string.IsNullOrEmpty(newFileName))
+            {
+                System.Diagnostics.Debug.WriteLine("[LLMChatView] User cancelled rename/move");
+                return;
+            }
+
+            // Determine if user provided a full path or just a filename
+            string newPath;
+            if (newFileName.Contains('\\') || newFileName.Contains('/'))
+            {
+                // User provided a full path
+                newPath = newFileName;
+            }
+            else
+            {
+                // User provided just a filename, use same directory
+                newPath = Path.Combine(currentDirectory!, newFileName);
+            }
+
+            // Check if target file already exists
+            if (File.Exists(newPath))
+            {
+                var overwrite = await DisplayActionSheet(
+                    "File Exists",
+                    $"A file named '{Path.GetFileName(newPath)}' already exists.",
+                    "Cancel",
+                    null,
+                    "Overwrite"
+                );
+
+                if (overwrite != "Overwrite")
+                {
+                    System.Diagnostics.Debug.WriteLine("[LLMChatView] User cancelled overwrite");
+                    return;
+                }
+            }
+
+            // Determine if context file should be moved too
+            var hasContextFile = !string.IsNullOrEmpty(_chatSession.CurrentFilePath);
+            var moveContextFile = false;
+
+            if (hasContextFile)
+            {
+                var contextFileName = Path.GetFileName(_chatSession.CurrentFilePath);
+                var moveContext = await DisplayActionSheet(
+                    "Move Context File",
+                    $"Also move the context file '{contextFileName}' to the same location?",
+                    "No",
+                    null,
+                    "Yes"
+                );
+
+                moveContextFile = moveContext == "Yes";
+            }
+
+            // Perform the rename/move operation
+            await PerformRenameMove(currentChatPath, newPath, moveContextFile);
+
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] Successfully renamed/moved chat file to: '{newPath}'");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] Error renaming/moving chat file: {ex.Message}");
+            await DisplayAlert("Error", $"Could not rename/move chat file: {ex.Message}", "OK");
+        }
+    }
+
+    /// <summary>
+    /// Perform the actual rename/move operation
+    /// </summary>
+    private async Task PerformRenameMove(string currentChatPath, string newChatPath, bool moveContextFile)
+    {
+        try
+        {
+            // Ensure target directory exists
+            var targetDirectory = Path.GetDirectoryName(newChatPath);
+            if (!string.IsNullOrEmpty(targetDirectory) && !Directory.Exists(targetDirectory))
+            {
+                Directory.CreateDirectory(targetDirectory);
+            }
+
+            // Save current session to the old path before moving
+            _chatSession.SaveCurrentSession();
+
+            // Move the chat file
+            if (File.Exists(currentChatPath))
+            {
+                File.Move(currentChatPath, newChatPath);
+            }
+
+            // Move context file if requested and it exists
+            string? newContextPath = null;
+            if (moveContextFile && !string.IsNullOrEmpty(_chatSession.CurrentFilePath) && File.Exists(_chatSession.CurrentFilePath))
+            {
+                var contextFileName = Path.GetFileName(_chatSession.CurrentFilePath);
+                newContextPath = Path.Combine(targetDirectory!, contextFileName);
+
+                // Handle case where context file would overwrite existing file
+                if (File.Exists(newContextPath))
+                {
+                    var counter = 1;
+                    var contextBaseName = Path.GetFileNameWithoutExtension(contextFileName);
+                    var contextExtension = Path.GetExtension(contextFileName);
+
+                    do
+                    {
+                        var tempName = $"{contextBaseName}_{counter:D2}{contextExtension}";
+                        newContextPath = Path.Combine(targetDirectory!, tempName);
+                        counter++;
+                    }
+                    while (File.Exists(newContextPath) && counter < 100);
+                }
+
+                File.Move(_chatSession.CurrentFilePath, newContextPath);
+                System.Diagnostics.Debug.WriteLine($"[LLMChatView] Moved context file to: '{newContextPath}'");
+            }
+
+            // Update the chat session with the new path
+            if (moveContextFile && !string.IsNullOrEmpty(newContextPath))
+            {
+                // Update both context file and chat file
+                _chatSession.CurrentFilePath = newContextPath;
+                _chatSession.SetChatFilePath(newChatPath);
+
+                // Reload context content from new location
+                var contextContent = await File.ReadAllTextAsync(newContextPath);
+                _chatSession.CurrentFileContent = contextContent;
+            }
+            else
+            {
+                // Only update chat file path
+                _chatSession.SetChatFilePath(newChatPath);
+            }
+
+            // Save the session to the new location
+            _chatSession.SaveCurrentSession();
+
+            // Refresh the display to show the new file path
+            RefreshMessageDisplay();
+
+            var successMessage = $"Chat file renamed/moved to: {Path.GetFileName(newChatPath)}";
+            if (moveContextFile && !string.IsNullOrEmpty(newContextPath))
+            {
+                successMessage += $"\nContext file moved to: {Path.GetFileName(newContextPath)}";
+            }
+
+            await DisplayAlert("Success", successMessage, "OK");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] Error in PerformRenameMove: {ex.Message}");
+            throw;
         }
     }
 
