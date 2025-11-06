@@ -69,19 +69,22 @@ public class GeminiPlugin : AIProviderPluginBase
         try
         {
             var contents = new List<object>();
-            string? systemInstruction = null;
 
-            // Process conversation history - separate system messages
+            // Process conversation history
             foreach (var msg in conversationHistory)
             {
                 if (msg.Role == "system")
                 {
-                    // Gemini uses systemInstruction parameter for system messages
-                    systemInstruction = msg.Content;
+                    // Add system message as the first content item with "user" role (Gemini workaround)
+                    contents.Add(new
+                    {
+                        role = "user",
+                        parts = new[] { new { text = $"System: {msg.Content}" } }
+                    });
                 }
                 else
                 {
-                    // Only add user/assistant messages to contents array
+                    // Add user/assistant messages normally
                     contents.Add(new
                     {
                         role = msg.Role,
@@ -97,23 +100,17 @@ public class GeminiPlugin : AIProviderPluginBase
                 parts = new[] { new { text = userMessage } }
             });
 
-            // Build request body with system instruction if present
+            // Build request body (no systemInstruction - using content-based approach)
             var requestBody = new Dictionary<string, object>
             {
                 ["contents"] = contents
             };
 
-            if (!string.IsNullOrEmpty(systemInstruction))
-            {
-                requestBody["systemInstruction"] = new
-                {
-                    text = systemInstruction
-                };
-                System.Diagnostics.Debug.WriteLine($"[GeminiPlugin] System instruction length: {systemInstruction.Length}");
-            }
+            System.Diagnostics.Debug.WriteLine($"[GeminiPlugin] Using content-based system message approach");
+            System.Diagnostics.Debug.WriteLine($"[GeminiPlugin] Total content items: {contents.Count}");
 
             var json = JsonSerializer.Serialize(requestBody);
-            System.Diagnostics.Debug.WriteLine($"[GeminiPlugin] Request body: {json}");
+            System.Diagnostics.Debug.WriteLine($"[GeminiPlugin] Final request body: {json}");
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             var url = $"{API_BASE}/models/{DEFAULT_MODEL}:generateContent?key={_apiKey}";

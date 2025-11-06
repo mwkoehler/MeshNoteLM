@@ -57,7 +57,10 @@ namespace MeshNoteLM.ViewModels
                 var allPlugins = _pluginManager.GetAllPlugins().ToList();
                 System.Diagnostics.Debug.WriteLine($"Total plugins: {allPlugins.Count}");
 
-                var fileSystemPlugins = allPlugins.OfType<IFileSystemPlugin>().ToList();
+                var fileSystemPlugins = allPlugins
+                    .OfType<IFileSystemPlugin>()
+                    .Where(p => p is not AIProviderPluginBase) // Exclude AI providers
+                    .ToList();
                 System.Diagnostics.Debug.WriteLine($"FileSystem plugins: {fileSystemPlugins.Count}");
 
                 var plugins = fileSystemPlugins.Where(p => p.IsEnabled).ToList();

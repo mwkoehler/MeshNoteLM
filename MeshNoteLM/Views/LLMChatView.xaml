@@ -2,17 +2,38 @@
 <ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="MeshNoteLM.Views.LLMChatView">
-    <Grid RowDefinitions="Auto,*,Auto" Padding="12" RowSpacing="12">
+    <Grid RowDefinitions="Auto,*,Auto" Padding="12" RowSpacing="8">
 
         <!-- Header with LLM Stack -->
-        <Grid Grid.Row="0" RowDefinitions="Auto,Auto" VerticalOptions="Start" RowSpacing="8">
-            <!-- Chat Title -->
-            <Label Grid.Row="0"
-                   Text="Chat"
-                   FontSize="14"
-                   FontAttributes="Bold"
-                   VerticalOptions="Start"
-                   HorizontalOptions="Start"/>
+        <Grid Grid.Row="0" RowDefinitions="Auto,Auto" VerticalOptions="Start" RowSpacing="4">
+            <!-- Chat Title Row -->
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+                <!-- Chat Title -->
+                <Label Grid.Column="0"
+                       Text="Chat"
+                       FontSize="14"
+                       FontAttributes="Bold"
+                       VerticalOptions="Start"
+                       HorizontalOptions="Start"/>
+
+                <!-- Close Chat Button -->
+                <Button Grid.Column="1"
+                        x:Name="CloseChatButton"
+                        Text="✕"
+                        Clicked="OnCloseChatClicked"
+                        BackgroundColor="Transparent"
+                        TextColor="#666666"
+                        FontSize="16"
+                        FontAttributes="Bold"
+                        WidthRequest="30"
+                        HeightRequest="30"
+                        Padding="0"
+                        CornerRadius="15"
+                        BorderColor="#CCCCCC"
+                        BorderWidth="1"
+                        VerticalOptions="Start"
+                        HorizontalOptions="End"/>
+            </Grid>
 
             <!-- Buttons Row -->
             <Grid Grid.Row="1" ColumnDefinitions="*,Auto,Auto" VerticalOptions="Start" ColumnSpacing="8">
@@ -24,7 +45,7 @@
                         BackgroundColor="#6C757D"
                         TextColor="White"
                         FontSize="11"
-                        HeightRequest="28"
+                        HeightRequest="24"
                         Padding="8,4"
                         MinimumWidthRequest="70"
                         VerticalOptions="Start"/>
@@ -47,7 +68,8 @@
             <VerticalStackLayout x:Name="MessagesContainer" Spacing="10"
                                  VerticalOptions="Start"
                                  HorizontalOptions="Fill"
-                                 Padding="5"/>
+                                 Padding="5"
+                                 MinimumWidthRequest="300"/>
         </ScrollView>
 
         <!-- Input Area -->
@@ -56,7 +78,7 @@
 
             <Editor Grid.Column="0"
                     x:Name="MessageInput"
-                    Placeholder="Type your question... (LLM Name: for specific LLM, Enter for new line, Ctrl+Enter or Send to send)"
+                    Placeholder="Type your question... (LLM Name: for specific LLM, Enter for new line, Send to send)"
                     HeightRequest="100"
                     VerticalOptions="Fill"
                     HorizontalOptions="Fill"
