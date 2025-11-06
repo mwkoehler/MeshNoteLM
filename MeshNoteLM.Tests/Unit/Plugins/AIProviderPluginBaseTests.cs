@@ -73,9 +73,7 @@ public class AIProviderPluginBaseTests : IDisposable
         var httpClient = new HttpClient();
         var plugin = new MockAIProviderPlugin(
             apiKey: null,
-            httpClient: httpClient,
-            settingsApiKey: null,
-            environmentApiKey: null);
+            httpClient: httpClient);
 
         // Act & Assert
         plugin.HasValidAuthorization().Should().BeFalse();

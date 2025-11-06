@@ -46,10 +46,9 @@ public class MetaPlugin : AIProviderPluginBase
         _baseUrl = baseUrl ?? DEFAULT_BASE_URL;
     }
 
-    protected override string? GetApiKeyFromSettings()
+    protected override string GetCredentialKey()
     {
-        var settingsService = MeshNoteLM.Services.AppServices.Services?.GetService<MeshNoteLM.Services.ISettingsService>();
-        return settingsService?.MetaApiKey;
+        return "meta-api-key";
     }
 
     protected override string? GetApiKeyFromEnvironment()

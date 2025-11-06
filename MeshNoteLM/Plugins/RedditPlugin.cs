@@ -101,9 +101,21 @@ public class RedditPlugin : PluginBase, IFileSystemPlugin
 
     public RedditPlugin(string? clientId = null, string? clientSecret = null, string? refreshToken = null, string? username = null, string? userAgent = null)
     {
-        _clientId = clientId ?? Environment.GetEnvironmentVariable("REDDIT_CLIENT_ID") ?? "";
-        _clientSecret = clientSecret ?? Environment.GetEnvironmentVariable("REDDIT_CLIENT_SECRET") ?? "";
-        _refreshToken = refreshToken ?? Environment.GetEnvironmentVariable("REDDIT_REFRESH_TOKEN") ?? "";
+        // Try constructor parameters first, then settings service, then environment variables
+        try
+        {
+            var settingsService = MeshNoteLM.Services.AppServices.Services?.GetService<MeshNoteLM.Services.ISettingsService>();
+            _clientId = clientId ?? settingsService?.GetCredential<string>("reddit-client-id") ?? Environment.GetEnvironmentVariable("REDDIT_CLIENT_ID") ?? "";
+            _clientSecret = clientSecret ?? settingsService?.GetCredential<string>("reddit-client-secret") ?? Environment.GetEnvironmentVariable("REDDIT_CLIENT_SECRET") ?? "";
+            _refreshToken = refreshToken ?? settingsService?.GetCredential<string>("reddit-refresh-token") ?? Environment.GetEnvironmentVariable("REDDIT_REFRESH_TOKEN") ?? "";
+        }
+        catch
+        {
+            _clientId = clientId ?? Environment.GetEnvironmentVariable("REDDIT_CLIENT_ID") ?? "";
+            _clientSecret = clientSecret ?? Environment.GetEnvironmentVariable("REDDIT_CLIENT_SECRET") ?? "";
+            _refreshToken = refreshToken ?? Environment.GetEnvironmentVariable("REDDIT_REFRESH_TOKEN") ?? "";
+        }
+
         _username = username ?? Environment.GetEnvironmentVariable("REDDIT_USERNAME") ?? "MeshNoteLM";
         _userAgent = userAgent ?? Environment.GetEnvironmentVariable("REDDIT_USER_AGENT") ?? $"MeshNoteLM/0.1 by {_username}";
 

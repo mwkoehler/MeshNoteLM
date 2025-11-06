@@ -85,7 +85,24 @@ public class NotionPlugin : PluginBase, IFileSystemPlugin
 
     public NotionPlugin(string? apiKey = null)
     {
-        _apiKey = apiKey ?? Environment.GetEnvironmentVariable("NOTION_API_KEY") ?? "";
+        // Try constructor parameter first, then settings service, then environment variable
+        if (!string.IsNullOrEmpty(apiKey))
+        {
+            _apiKey = apiKey;
+        }
+        else
+        {
+            try
+            {
+                var settingsService = MeshNoteLM.Services.AppServices.Services?.GetService<MeshNoteLM.Services.ISettingsService>();
+                _apiKey = settingsService?.GetCredential<string>("notion-api-key") ?? Environment.GetEnvironmentVariable("NOTION_API_KEY") ?? "";
+            }
+            catch
+            {
+                _apiKey = Environment.GetEnvironmentVariable("NOTION_API_KEY") ?? "";
+            }
+        }
+
         _httpClient = new HttpClient();
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
         _httpClient.DefaultRequestHeaders.Add("Notion-Version", API_VERSION);

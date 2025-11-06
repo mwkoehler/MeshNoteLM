@@ -81,7 +81,24 @@ public class ReaderPlugin : PluginBase, IFileSystemPlugin
 
     public ReaderPlugin(string? token = null)
     {
-        _token = token ?? Environment.GetEnvironmentVariable("READWISE_TOKEN") ?? "";
+        // Try constructor parameter first, then settings service, then environment variable
+        if (!string.IsNullOrEmpty(token))
+        {
+            _token = token;
+        }
+        else
+        {
+            try
+            {
+                var settingsService = MeshNoteLM.Services.AppServices.Services?.GetService<MeshNoteLM.Services.ISettingsService>();
+                _token = settingsService?.GetCredential<string>("reader-api-key") ?? Environment.GetEnvironmentVariable("READWISE_TOKEN") ?? "";
+            }
+            catch
+            {
+                _token = Environment.GetEnvironmentVariable("READWISE_TOKEN") ?? "";
+            }
+        }
+
         _httpClient = new HttpClient();
         _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Token", _token);
     }

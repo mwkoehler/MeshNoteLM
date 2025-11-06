@@ -11,21 +11,17 @@ namespace MeshNoteLM.Tests.Mocks;
 /// </summary>
 public class MockAIProviderPlugin : AIProviderPluginBase
 {
-    private readonly string? _settingsApiKey;
-    private readonly string? _environmentApiKey;
+    private readonly string? _providedApiKey;
     private readonly List<string> _availableModels;
     private string? _lastConfiguredBaseAddress;
 
     public MockAIProviderPlugin(
         string? apiKey = null,
         HttpClient? httpClient = null,
-        string? settingsApiKey = null,
-        string? environmentApiKey = null,
         List<string>? availableModels = null)
         : base(apiKey, httpClient)
     {
-        _settingsApiKey = settingsApiKey;
-        _environmentApiKey = environmentApiKey;
+        _providedApiKey = apiKey;
         _availableModels = availableModels ?? ["model-1", "model-2", "model-3"];
     }
 
@@ -59,14 +55,15 @@ public class MockAIProviderPlugin : AIProviderPluginBase
         return GetMessageIndex(fileName);
     }
 
-    protected override string? GetApiKeyFromSettings()
+    protected override string GetCredentialKey()
     {
-        return _settingsApiKey;
+        return "mock-api-key";
     }
 
     protected override string? GetApiKeyFromEnvironment()
     {
-        return _environmentApiKey;
+        // For testing, return a predictable value based on the provided API key
+        return _providedApiKey != null ? $"env-{_providedApiKey}" : null;
     }
 
     protected override async Task<string> SendMessageToProviderAsync(List<Message> conversationHistory, string userMessage)

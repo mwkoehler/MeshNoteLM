@@ -44,10 +44,9 @@ public class OpenAIPlugin : AIProviderPluginBase
     {
     }
 
-    protected override string? GetApiKeyFromSettings()
+    protected override string GetCredentialKey()
     {
-        var settingsService = MeshNoteLM.Services.AppServices.Services?.GetService<MeshNoteLM.Services.ISettingsService>();
-        return settingsService?.OpenAIApiKey;
+        return "openai-api-key";
     }
 
     protected override string? GetApiKeyFromEnvironment()

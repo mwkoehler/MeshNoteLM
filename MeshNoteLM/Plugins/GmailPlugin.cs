@@ -141,10 +141,10 @@ namespace MeshNoteLM.Plugins
         {
             try
             {
-                // Get credentials from settings service (like other plugins)
+                // Get credentials from settings service using new generic credential methods
                 var settingsService = MeshNoteLM.Services.AppServices.Services?.GetService<MeshNoteLM.Services.ISettingsService>();
-                var clientId = settingsService?.GoogleClientId ?? Environment.GetEnvironmentVariable("GOOGLE_CLIENT_ID") ?? "";
-                var clientSecret = settingsService?.GoogleClientSecret ?? Environment.GetEnvironmentVariable("GOOGLE_CLIENT_SECRET") ?? "";
+                var clientId = settingsService?.GetCredential<string>("google-client-id") ?? Environment.GetEnvironmentVariable("GOOGLE_CLIENT_ID") ?? "";
+                var clientSecret = settingsService?.GetCredential<string>("google-client-secret") ?? Environment.GetEnvironmentVariable("GOOGLE_CLIENT_SECRET") ?? "";
 
                 if (string.IsNullOrEmpty(clientId) || string.IsNullOrEmpty(clientSecret))
                 {

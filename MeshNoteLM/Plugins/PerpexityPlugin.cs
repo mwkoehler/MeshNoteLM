@@ -44,10 +44,9 @@ public class PerpexityPlugin : AIProviderPluginBase
     {
     }
 
-    protected override string? GetApiKeyFromSettings()
+    protected override string GetCredentialKey()
     {
-        var settingsService = MeshNoteLM.Services.AppServices.Services?.GetService<MeshNoteLM.Services.ISettingsService>();
-        return settingsService?.PerplexityApiKey;
+        return "perplexity-api-key";
     }
 
     protected override string? GetApiKeyFromEnvironment()

@@ -39,6 +39,7 @@
     <Compile Include="..\MeshNoteLM\Services\LLMChatSession.cs" Link="Services\LLMChatSession.cs" />
     <Compile Include="..\MeshNoteLM\Services\ActivatorUtilities.cs" Link="Services\ActivatorUtilities.cs" />
     <Compile Include="..\MeshNoteLM\Services\MicrosoftAuthService.cs" Link="Services\MicrosoftAuthService.cs" />
+    <Compile Include="..\MeshNoteLM\Services\AppServices.cs" Link="Services\AppServices.cs" />
     <Compile Include="..\MeshNoteLM\Services\MicrosoftGraphOfficeConverter.cs" Link="Services\MicrosoftGraphOfficeConverter.cs" />
     <Compile Include="..\MeshNoteLM\Helpers\MarkdownRegexs.cs" Link="Helpers\MarkdownRegexs.cs" />
     <Compile Include="..\MeshNoteLM\Helpers\FileTypeDetector.cs" Link="Helpers\FileTypeDetector.cs" />

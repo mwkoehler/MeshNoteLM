@@ -44,10 +44,9 @@ public class MistralPlugin : AIProviderPluginBase
     {
     }
 
-    protected override string? GetApiKeyFromSettings()
+    protected override string GetCredentialKey()
     {
-        var settingsService = MeshNoteLM.Services.AppServices.Services?.GetService<MeshNoteLM.Services.ISettingsService>();
-        return settingsService?.MistralApiKey;
+        return "mistral-api-key";
     }
 
     protected override string? GetApiKeyFromEnvironment()

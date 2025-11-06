@@ -1,6 +1,8 @@
 using MeshNoteLM.Interfaces;
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 
 namespace MeshNoteLM.Services
@@ -30,6 +32,12 @@ namespace MeshNoteLM.Services
 
         void Save();
         void Load();
+
+        // Generic credential methods
+        T? GetCredential<T>(string key, T? defaultValue = default);
+        void SetCredential<T>(string key, T? value);
+        bool HasCredential(string key);
+        bool HasCredentials(params string[] keys);
     }
 
     public class SettingsService : ISettingsService
@@ -146,6 +154,67 @@ namespace MeshNoteLM.Services
             set { _settings.ReaderApiKey = value; Save(); }
         }
 
+        // Generic credential methods implementation
+        public T? GetCredential<T>(string key, T? defaultValue = default)
+        {
+            try
+            {
+                if (_settings.GenericCredentials.TryGetValue(key, out var value) && value != null)
+                {
+                    // Handle JSON serialization for complex types
+                    if (typeof(T) == typeof(string) && value is string stringValue)
+                        return (T?)(object?)stringValue;
+
+                    // For simple types, try direct conversion
+                    if (value is T directValue)
+                        return directValue;
+
+                    // Try JSON serialization for complex objects
+                    var json = JsonSerializer.Serialize(value);
+                    return JsonSerializer.Deserialize<T>(json);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[SettingsService] Error getting credential '{key}': {ex.Message}");
+            }
+
+            return defaultValue;
+        }
+
+        public void SetCredential<T>(string key, T? value)
+        {
+            try
+            {
+                if (value == null)
+                {
+                    _settings.GenericCredentials.Remove(key);
+                }
+                else
+                {
+                    _settings.GenericCredentials[key] = value;
+                }
+                Save();
+
+                System.Diagnostics.Debug.WriteLine($"[SettingsService] Set credential '{key}' of type {typeof(T).Name}");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[SettingsService] Error setting credential '{key}': {ex.Message}");
+            }
+        }
+
+        public bool HasCredential(string key)
+        {
+            return _settings.GenericCredentials.ContainsKey(key) &&
+                   _settings.GenericCredentials[key] != null;
+        }
+
+        public bool HasCredentials(params string[] keys)
+        {
+            return keys.All(HasCredential);
+        }
+
         public void Save()
         {
             try
@@ -205,6 +274,9 @@ namespace MeshNoteLM.Services
             public string? RedditClientSecret { get; set; }
             public string? RedditRefreshToken { get; set; }
             public string? ReaderApiKey { get; set; }
+
+            // Generic credentials storage
+            public Dictionary<string, object?> GenericCredentials { get; set; } = new();
         }
     }
 }

@@ -64,7 +64,7 @@ public abstract class AIProviderPluginBase : PluginBase, IFileSystemPlugin
     }
 
     // Abstract methods for derived classes to implement
-    protected abstract string? GetApiKeyFromSettings();
+    protected abstract string GetCredentialKey();
     protected abstract string? GetApiKeyFromEnvironment();
     protected abstract Task<string> SendMessageToProviderAsync(List<Message> conversationHistory, string userMessage);
     protected abstract IEnumerable<string> GetAvailableModels();
@@ -86,9 +86,14 @@ public abstract class AIProviderPluginBase : PluginBase, IFileSystemPlugin
 
         try
         {
-            var settingsKey = GetApiKeyFromSettings();
-            if (!string.IsNullOrWhiteSpace(settingsKey))
-                return settingsKey;
+            var settingsService = MeshNoteLM.Services.AppServices.Services?.GetService(typeof(MeshNoteLM.Services.ISettingsService)) as MeshNoteLM.Services.ISettingsService;
+            var credentialKey = GetCredentialKey();
+            if (!string.IsNullOrWhiteSpace(credentialKey))
+            {
+                var settingsKey = settingsService?.GetCredential<string>(credentialKey);
+                if (!string.IsNullOrWhiteSpace(settingsKey))
+                    return settingsKey;
+            }
         }
         catch { /* Settings service not available yet */ }
 
