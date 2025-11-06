@@ -42,7 +42,16 @@ public partial class LLMChatView : ContentView
         InitializeLLMColors();
 
         // Subscribe to message collection changes
-        _chatSession.Messages.CollectionChanged += (s, e) => RefreshMessageDisplay();
+        _chatSession.Messages.CollectionChanged += (s, e) =>
+        {
+            RefreshMessageDisplay();
+            // Additional delayed scroll to ensure we're at the bottom after UI settles
+            MainThread.BeginInvokeOnMainThread(async () =>
+            {
+                await Task.Delay(300); // Longer delay for UI to completely settle
+                await ScrollToBottomSafely();
+            });
+        };
 
         // Hook into Loaded event to ensure plugins are available
         this.Loaded += (s, e) =>
@@ -904,14 +913,49 @@ public partial class LLMChatView : ContentView
                     await Task.Delay(50);
                 }
 
-                // Scroll to bottom with multiple methods
+                // Enhanced auto-scroll to bottom with multiple fallback methods
                 if (ChatScrollView.Content != null)
                 {
-                    await ChatScrollView.ScrollToAsync(0, contentHeight, animated: false);
-                    await Task.Delay(50);
+                    System.Diagnostics.Debug.WriteLine("[LLMChatView] Starting auto-scroll to bottom...");
 
-                    // Try alternative method
-                    await ChatScrollView.ScrollToAsync(ChatScrollView, ScrollToPosition.End, animated: false);
+                    // Method 1: Direct scroll to end position
+                    try
+                    {
+                        await ChatScrollView.ScrollToAsync(ChatScrollView, ScrollToPosition.End, animated: false);
+                        System.Diagnostics.Debug.WriteLine("[LLMChatView] Method 1: ScrollToPosition.End completed");
+                        await Task.Delay(100);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[LLMChatView] Method 1 failed: {ex.Message}");
+                    }
+
+                    // Method 2: Scroll by calculated height if Method 1 didn't work
+                    try
+                    {
+                        var finalContentHeight = ChatScrollView.Content?.Height ?? 0;
+                        await ChatScrollView.ScrollToAsync(0, finalContentHeight, animated: false);
+                        System.Diagnostics.Debug.WriteLine($"[LLMChatView] Method 2: Scroll to height {finalContentHeight} completed");
+                        await Task.Delay(50);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[LLMChatView] Method 2 failed: {ex.Message}");
+                    }
+
+                    // Method 3: Force layout and scroll again (final attempt)
+                    try
+                    {
+                        ChatScrollView.LayoutTo(new Rect(ChatScrollView.Bounds.X, ChatScrollView.Bounds.Y,
+                                                       ChatScrollView.Bounds.Width, ChatScrollView.Bounds.Height));
+                        await Task.Delay(50);
+                        await ChatScrollView.ScrollToAsync(ChatScrollView, ScrollToPosition.End, animated: false);
+                        System.Diagnostics.Debug.WriteLine("[LLMChatView] Method 3: Layout + scroll completed");
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[LLMChatView] Method 3 failed: {ex.Message}");
+                    }
                 }
 
 #if WINDOWS || MACCATALYST
@@ -931,6 +975,32 @@ public partial class LLMChatView : ContentView
                 System.Diagnostics.Debug.WriteLine($"[LLMChatView] Error in RefreshMessageDisplay: {ex.Message}");
             }
         });
+    }
+
+    /// <summary>
+    /// Safely scroll to the bottom of the chat with error handling
+    /// </summary>
+    private async Task ScrollToBottomSafely()
+    {
+        try
+        {
+            if (ChatScrollView != null && MessagesContainer != null)
+            {
+                System.Diagnostics.Debug.WriteLine("[LLMChatView] ScrollToBottomSafely: Starting scroll to bottom");
+
+                // Wait a bit more for any pending UI operations
+                await Task.Delay(100);
+
+                // Use the most reliable method
+                await ChatScrollView.ScrollToAsync(ChatScrollView, ScrollToPosition.End, animated: false);
+
+                System.Diagnostics.Debug.WriteLine("[LLMChatView] ScrollToBottomSafely: Successfully scrolled to bottom");
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] ScrollToBottomSafely: Error scrolling to bottom: {ex.Message}");
+        }
     }
 
     /// <summary>
