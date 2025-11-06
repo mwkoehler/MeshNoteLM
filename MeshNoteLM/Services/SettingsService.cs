@@ -21,6 +21,8 @@ namespace MeshNoteLM.Services
         // Other Service Credentials
         string? NotionApiKey { get; set; }
         string? GoogleDriveCredentialsPath { get; set; }
+        string? GoogleClientId { get; set; }
+        string? GoogleClientSecret { get; set; }
         string? RedditClientId { get; set; }
         string? RedditClientSecret { get; set; }
         string? RedditRefreshToken { get; set; }
@@ -108,6 +110,18 @@ namespace MeshNoteLM.Services
             set { _settings.GoogleDriveCredentialsPath = value; Save(); }
         }
 
+        public string? GoogleClientId
+        {
+            get => _settings.GoogleClientId;
+            set { _settings.GoogleClientId = value; Save(); }
+        }
+
+        public string? GoogleClientSecret
+        {
+            get => _settings.GoogleClientSecret;
+            set { _settings.GoogleClientSecret = value; Save(); }
+        }
+
         public string? RedditClientId
         {
             get => _settings.RedditClientId;
@@ -185,6 +199,8 @@ namespace MeshNoteLM.Services
             // Other Service Credentials
             public string? NotionApiKey { get; set; }
             public string? GoogleDriveCredentialsPath { get; set; }
+            public string? GoogleClientId { get; set; }
+            public string? GoogleClientSecret { get; set; }
             public string? RedditClientId { get; set; }
             public string? RedditClientSecret { get; set; }
             public string? RedditRefreshToken { get; set; }

@@ -141,12 +141,22 @@ namespace MeshNoteLM.Plugins
         {
             try
             {
-                // Use the same credential mechanism as Google Drive plugin
+                // Get credentials from settings service (like other plugins)
+                var settingsService = MeshNoteLM.Services.AppServices.Services?.GetService<MeshNoteLM.Services.ISettingsService>();
+                var clientId = settingsService?.GoogleClientId ?? Environment.GetEnvironmentVariable("GOOGLE_CLIENT_ID") ?? "";
+                var clientSecret = settingsService?.GoogleClientSecret ?? Environment.GetEnvironmentVariable("GOOGLE_CLIENT_SECRET") ?? "";
+
+                if (string.IsNullOrEmpty(clientId) || string.IsNullOrEmpty(clientSecret))
+                {
+                    throw new InvalidOperationException("Google Client ID and Client Secret must be configured in Settings");
+                }
+
+                // Use OAuth2 credential mechanism for Gmail
                 var credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
                     new ClientSecrets
                     {
-                        ClientId = Environment.GetEnvironmentVariable("GOOGLE_CLIENT_ID") ?? "",
-                        ClientSecret = Environment.GetEnvironmentVariable("GOOGLE_CLIENT_SECRET") ?? ""
+                        ClientId = clientId,
+                        ClientSecret = clientSecret
                     },
                     new[] { GMAIL_API_SCOPE },
                     "MeshNoteLM_Gmail",
