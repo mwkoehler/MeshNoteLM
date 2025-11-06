@@ -347,7 +347,7 @@ public partial class LLMChatView : ContentView
         if (!string.IsNullOrEmpty(fileContent))
         {
             System.Diagnostics.Debug.WriteLine($"[LLMChatView] File content length: {fileContent.Length}");
-            System.Diagnostics.Debug.WriteLine($"[LLMChatView] File content preview: {fileContent.Substring(0, Math.Min(200, fileContent.Length))}...");
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] File content preview: {fileContent[..Math.Min(200, fileContent.Length)]}...");
         }
         else
         {
@@ -617,7 +617,7 @@ public partial class LLMChatView : ContentView
 
                 System.Diagnostics.Debug.WriteLine($"[LLMChatView] Added file context for {fileName}, file content length: {fileContent.Length}");
                 System.Diagnostics.Debug.WriteLine($"[LLMChatView] System message length: {contextMessage.Length}");
-                System.Diagnostics.Debug.WriteLine($"[LLMChatView] Context message preview: {contextMessage.Substring(0, Math.Min(150, contextMessage.Length))}...");
+                System.Diagnostics.Debug.WriteLine($"[LLMChatView] Context message preview: {contextMessage[..Math.Min(150, contextMessage.Length)]}...");
             }
             else
             {
@@ -639,7 +639,7 @@ public partial class LLMChatView : ContentView
                     System.Diagnostics.Debug.WriteLine($"[LLMChatView] History count: {history.Count}");
                     if (history.Count > 0)
                     {
-                        System.Diagnostics.Debug.WriteLine($"[LLMChatView] First history entry ({history[0].Role}): {history[0].Content.Substring(0, Math.Min(100, history[0].Content.Length))}...");
+                        System.Diagnostics.Debug.WriteLine($"[LLMChatView] First history entry ({history[0].Role}): {history[0].Content[..Math.Min(100, history[0].Content.Length)]}...");
                     }
                     System.Diagnostics.Debug.WriteLine($"[LLMChatView] User message: {actualMessage}");
 
@@ -880,10 +880,7 @@ public partial class LLMChatView : ContentView
                 await Task.Delay(50);
 
                 // Force the ScrollView content to remeasure
-                if (ChatScrollView.Content != null)
-                {
-                    ChatScrollView.Content.InvalidateMeasure();
-                }
+                ChatScrollView.Content?.InvalidateMeasure();
                 ChatScrollView.InvalidateMeasure();
                 await Task.Delay(100);
 
@@ -1095,7 +1092,9 @@ public partial class LLMChatView : ContentView
         try
         {
             // Google Drive patterns
-            if (filePath.Contains("drive.google.com") || filePath.Contains("/Google Drive/") || filePath.Contains("gdocs://"))
+            if (filePath.Contains("drive.google.com", StringComparison.OrdinalIgnoreCase) ||
+                filePath.Contains("/Google Drive/", StringComparison.OrdinalIgnoreCase) ||
+                filePath.Contains("gdocs://", StringComparison.OrdinalIgnoreCase))
             {
                 // Extract file ID from Google Drive URL or path
                 var fileId = ExtractGoogleDriveFileId(filePath);
@@ -1107,10 +1106,12 @@ public partial class LLMChatView : ContentView
             }
 
             // OneDrive patterns
-            if (filePath.Contains("onedrive.live.com") || filePath.Contains("/OneDrive/") || filePath.Contains("1drv.ms/"))
+            if (filePath.Contains("onedrive.live.com", StringComparison.OrdinalIgnoreCase) ||
+                filePath.Contains("/OneDrive/", StringComparison.OrdinalIgnoreCase) ||
+                filePath.Contains("1drv.ms/", StringComparison.OrdinalIgnoreCase))
             {
                 // Extract OneDrive file ID or use direct URL
-                if (filePath.Contains("onedrive.live.com"))
+                if (filePath.Contains("onedrive.live.com", StringComparison.OrdinalIgnoreCase))
                 {
                     webUrl = filePath;
                     return true;
@@ -1118,10 +1119,11 @@ public partial class LLMChatView : ContentView
             }
 
             // Dropbox patterns
-            if (filePath.Contains("dropbox.com") || filePath.Contains("/Dropbox/"))
+            if (filePath.Contains("dropbox.com", StringComparison.OrdinalIgnoreCase) ||
+                filePath.Contains("/Dropbox/", StringComparison.OrdinalIgnoreCase))
             {
                 // Generate Dropbox share URL
-                if (filePath.Contains("dropbox.com"))
+                if (filePath.Contains("dropbox.com", StringComparison.OrdinalIgnoreCase))
                 {
                     webUrl = filePath;
                     return true;
@@ -1129,9 +1131,10 @@ public partial class LLMChatView : ContentView
             }
 
             // iCloud patterns
-            if (filePath.Contains("icloud.com") || filePath.Contains("/iCloud/"))
+            if (filePath.Contains("icloud.com", StringComparison.OrdinalIgnoreCase) ||
+                filePath.Contains("/iCloud/", StringComparison.OrdinalIgnoreCase))
             {
-                if (filePath.Contains("icloud.com"))
+                if (filePath.Contains("icloud.com", StringComparison.OrdinalIgnoreCase))
                 {
                     webUrl = filePath;
                     return true;
@@ -1537,7 +1540,8 @@ public partial class LLMChatView : ContentView
                                 Role = currentRole.ToLower(),
                                 Content = currentContent.Trim(),
                                 Timestamp = currentTimestamp,
-                                ErrorMessage = currentRole.ToLower().Contains("error") ? currentContent.Trim() : null
+                                // Use case-insensitive Contains to detect "error" without ToLower allocation
+                                ErrorMessage = currentRole.Contains("error", StringComparison.OrdinalIgnoreCase) ? currentContent.Trim() : null
                             };
                             messages.Add(message);
                         }
@@ -1576,7 +1580,8 @@ public partial class LLMChatView : ContentView
                     Role = currentRole.ToLower(),
                     Content = currentContent.Trim(),
                     Timestamp = currentTimestamp,
-                    ErrorMessage = currentRole.ToLower().Contains("error") ? currentContent.Trim() : null
+                    // Use case-insensitive Contains to detect "error" without ToLower allocation
+                    ErrorMessage = currentRole.Contains("error", StringComparison.OrdinalIgnoreCase) ? currentContent.Trim() : null
                 };
                 messages.Add(message);
             }
