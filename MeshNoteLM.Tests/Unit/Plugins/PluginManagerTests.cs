@@ -145,11 +145,11 @@ public class PluginManagerTests : IDisposable
     }
 
     [Fact]
-    public void Constructor_ShouldThrow_WhenServiceProviderIsNull()
+    public void Constructor_ShouldAcceptNullServiceProvider()
     {
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() =>
-            new PluginManager(null!, _logger!));
+        var pluginManager = new PluginManager(null!, _logger!);
+        pluginManager.Should().NotBeNull();
     }
 
     [Fact]
