@@ -71,6 +71,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<PackageReference Include="Google.Apis.Gmail.v1" Version="1.70.0.3833" />
 		<PackageReference Include="MauiViewer.OfficeDocuments" Version="2.0.0" />
 		<PackageReference Include="MauiViewer.OpenOffice" Version="1.0.0" />
 		<PackageReference Include="MauiViewer.PdfViewer" Version="1.0.0" />
