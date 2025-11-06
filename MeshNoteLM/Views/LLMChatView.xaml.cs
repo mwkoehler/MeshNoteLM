@@ -1140,10 +1140,40 @@ public partial class LLMChatView : ContentView
             }
 
             // Try to open with default application
-            await Launcher.Default.OpenAsync(new OpenFileRequest
+            // Use the full absolute path for better compatibility
+            var fullPath = Path.GetFullPath(chatFilePath);
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] Attempting to open full path: {fullPath}");
+
+            try
             {
-                File = new ReadOnlyFile(chatFilePath)
-            });
+                await Launcher.Default.OpenAsync(new OpenFileRequest
+                {
+                    File = new ReadOnlyFile(fullPath)
+                });
+            }
+            catch (Exception launcherEx)
+            {
+                System.Diagnostics.Debug.WriteLine($"[LLMChatView] Launcher.OpenAsync failed: {launcherEx.Message}");
+
+                // Fallback: try opening with Process.Start on Windows
+                #if WINDOWS
+                try
+                {
+                    using var process = new System.Diagnostics.Process();
+                    process.StartInfo.FileName = fullPath;
+                    process.StartInfo.UseShellExecute = true;
+                    process.Start();
+                    System.Diagnostics.Debug.WriteLine($"[LLMChatView] Opened file with Process.Start");
+                }
+                catch (Exception processEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[LLMChatView] Process.Start also failed: {processEx.Message}");
+                    throw; // Re-throw the original exception
+                }
+                #else
+                throw; // Re-throw the original launcher exception on non-Windows platforms
+                #endif
+            }
         }
         catch (Exception ex)
         {
