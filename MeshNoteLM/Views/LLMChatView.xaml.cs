@@ -16,6 +16,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.Storage;
+using Microsoft.Maui.ApplicationModel;
 using MeshNoteLM.Services;
 using MeshNoteLM.Models;
 using MeshNoteLM.Plugins;
@@ -48,7 +49,36 @@ public partial class LLMChatView : ContentView
         {
             SelectDefaultLLM();
             SetupKeyboardHandlers();
+
+            // Debug initial layout state
+            DebugLayoutState();
         };
+
+        // Handle keyboard events at the page level
+#if WINDOWS || MACCATALYST
+        this.Focused += OnChatViewFocused;
+#endif
+    }
+
+    /// <summary>
+    /// Debug the layout state to understand sizing issues
+    /// </summary>
+    private void DebugLayoutState()
+    {
+        MainThread.BeginInvokeOnMainThread(async () =>
+        {
+            await Task.Delay(100); // Let layout settle
+
+            System.Diagnostics.Debug.WriteLine($"=== LLMChatView Layout Debug ===");
+            System.Diagnostics.Debug.WriteLine($"Main Grid Height: {this.Height}");
+            System.Diagnostics.Debug.WriteLine($"Main Grid Width: {this.Width}");
+            System.Diagnostics.Debug.WriteLine($"ScrollView Height: {ChatScrollView.Height}");
+            System.Diagnostics.Debug.WriteLine($"ScrollView Width: {ChatScrollView.Width}");
+            System.Diagnostics.Debug.WriteLine($"ScrollView Content Height: {ChatScrollView.Content?.Height ?? 0}");
+            System.Diagnostics.Debug.WriteLine($"MessagesContainer Height: {MessagesContainer.Height}");
+            System.Diagnostics.Debug.WriteLine($"MessagesContainer Children Count: {MessagesContainer.Children.Count}");
+            System.Diagnostics.Debug.WriteLine($"================================");
+        });
     }
 
     /// <summary>
@@ -60,6 +90,7 @@ public partial class LLMChatView : ContentView
         _ = SendMessage();
     }
 
+    
     
     /// <summary>
     /// Setup keyboard handlers for keyboard shortcuts
@@ -116,6 +147,9 @@ public partial class LLMChatView : ContentView
             // The Editor's Completed event is more reliable on Windows
             System.Diagnostics.Debug.WriteLine("[LLMChatView] Windows: Enhanced keyboard handling enabled");
 
+            // Set up keyboard event handling for the ScrollView
+            ChatScrollView.Focused += OnScrollViewFocused;
+
             // On Windows, users can use Ctrl+Enter which may trigger the Completed event
             // Or they can use the Send button
         }
@@ -130,7 +164,7 @@ public partial class LLMChatView : ContentView
     /// <summary>
     /// macOS-specific keyboard handling
     /// </summary>
-    private static void SetupMacKeyboardHandlers()
+    private void SetupMacKeyboardHandlers()
     {
         // Enhanced macOS keyboard handling
         try
@@ -138,6 +172,9 @@ public partial class LLMChatView : ContentView
             // On macOS, the Completed event works more reliably with keyboard shortcuts
             // Standard Mac keyboard shortcuts are more naturally supported
             System.Diagnostics.Debug.WriteLine("[LLMChatView] macOS: Enhanced keyboard handling enabled");
+
+            // Set up keyboard event handling for the ScrollView
+            ChatScrollView.Focused += OnScrollViewFocused;
         }
         catch (Exception ex)
         {
@@ -145,9 +182,135 @@ public partial class LLMChatView : ContentView
         }
     }
 #endif
+
+    /// <summary>
+    /// Handle ScrollView focus for keyboard navigation (shared)
+    /// </summary>
+    private void OnScrollViewFocused(object? sender, FocusEventArgs e)
+    {
+        // ScrollView is focused, ensure it can handle keyboard input
+        System.Diagnostics.Debug.WriteLine("[LLMChatView] ScrollView focused, keyboard navigation enabled");
+
+        // Add keyboard event handler for desktop platforms
+        SetupKeyboardScrolling();
+    }
+
+  /// <summary>
+    /// Setup keyboard scrolling for desktop platforms
+    /// </summary>
+    private void SetupKeyboardScrolling()
+    {
+        try
+        {
+            System.Diagnostics.Debug.WriteLine("[LLMChatView] Setting up keyboard scrolling for desktop platform");
+
+            // Ensure ScrollView can receive focus
+            ChatScrollView.IsEnabled = true;
+            ChatScrollView.Focus();
+
+            // Try to set focus to ScrollView when message input loses focus
+            MessageInput.Unfocused += OnMessageInputUnfocused;
+
+            // Also try to set focus when ScrollView is tapped
+            AddTapGestureRecognizerToScrollView();
+
+            System.Diagnostics.Debug.WriteLine("[LLMChatView] Keyboard navigation enabled - Try clicking in the chat area, then use PageUp/PageDown/Home/End/Arrow keys");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] Error setting up keyboard scrolling: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Handle message input losing focus - transfer to ScrollView
+    /// </summary>
+    private void OnMessageInputUnfocused(object? sender, FocusEventArgs e)
+    {
+        try
+        {
+            System.Diagnostics.Debug.WriteLine("[LLMChatView] MessageInput lost focus, setting focus to ScrollView");
+            ChatScrollView.Focus();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] Error transferring focus to ScrollView: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Add tap gesture recognizer to ScrollView for focus
+    /// </summary>
+    private void AddTapGestureRecognizerToScrollView()
+    {
+        try
+        {
+            var tapGesture = new TapGestureRecognizer();
+            tapGesture.Tapped += (s, e) =>
+            {
+                System.Diagnostics.Debug.WriteLine("[LLMChatView] ScrollView tapped, setting focus");
+                ChatScrollView.Focus();
+            };
+
+            ChatScrollView.GestureRecognizers.Add(tapGesture);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] Error adding tap gesture: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Handle chat view getting focus - setup keyboard handlers
+    /// </summary>
+    private void OnChatViewFocused(object? sender, FocusEventArgs e)
+    {
+        System.Diagnostics.Debug.WriteLine("[LLMChatView] ChatView focused, setting up global keyboard handlers");
+        SetupGlobalKeyboardHandlers();
+    }
+
+#if WINDOWS || MACCATALYST
+    /// <summary>
+    /// Setup global keyboard handlers for the entire view
+    /// </summary>
+    private void SetupGlobalKeyboardHandlers()
+    {
+        try
+        {
+            System.Diagnostics.Debug.WriteLine("[LLMChatView] Setting up simple keyboard navigation");
+
+            // For now, add visual instructions for the user
+            // .NET MAUI ScrollView keyboard navigation requires complex platform-specific handling
+            System.Diagnostics.Debug.WriteLine("[LLMChatView] NOTE: Keyboard navigation in .NET MAUI ScrollView requires:");
+            System.Diagnostics.Debug.WriteLine("[LLMChatView] 1. Click in the chat area to focus the ScrollView");
+            System.Diagnostics.Debug.WriteLine("[LLMChatView] 2. Use mouse wheel or scrollbar to navigate");
+            System.Diagnostics.Debug.WriteLine("[LLMChatView] 3. Custom keyboard handling requires platform-specific implementations");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] Error setting up keyboard handlers: {ex.Message}");
+        }
+    }
 #endif
 
-    
+    /// <summary>
+    /// Handle keyboard events for enhanced scrolling on desktop platforms
+    /// </summary>
+    private void OnKeyboardKeyPressed(object? sender, EventArgs e)
+    {
+        try
+        {
+            System.Diagnostics.Debug.WriteLine("[LLMChatView] Keyboard key pressed in ScrollView");
+            // This is a placeholder for any custom keyboard handling
+            // .NET MAUI ScrollView should handle most keyboard navigation automatically
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] Error handling keyboard input: {ex.Message}");
+        }
+    }
+#endif
+
     /// <summary>
     /// Initialize color mappings for different LLM providers
     /// </summary>
@@ -171,8 +334,22 @@ public partial class LLMChatView : ContentView
     /// </summary>
     public void SetFileContext(string? filePath, string? fileContent)
     {
+        System.Diagnostics.Debug.WriteLine($"[LLMChatView] SetFileContext called with: '{filePath}'");
+        if (!string.IsNullOrEmpty(fileContent))
+        {
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] File content length: {fileContent.Length}");
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] File content preview: {fileContent.Substring(0, Math.Min(200, fileContent.Length))}...");
+        }
+        else
+        {
+            System.Diagnostics.Debug.WriteLine("[LLMChatView] File content is null or empty");
+        }
+
         _chatSession.CurrentFilePath = filePath;
         _chatSession.CurrentFileContent = fileContent;
+
+        System.Diagnostics.Debug.WriteLine($"[LLMChatView] _chatSession.CurrentFilePath set to: '{_chatSession.CurrentFilePath}'");
+        System.Diagnostics.Debug.WriteLine($"[LLMChatView] _chatSession.CurrentFileContent length: {_chatSession.CurrentFileContent?.Length ?? 0}");
 
         // Refresh display to show loaded messages
         RefreshMessageDisplay();
@@ -262,10 +439,10 @@ public partial class LLMChatView : ContentView
             var button = new Button
             {
                 Text = llm.Name,
-                Padding = new Thickness(8, 4),
-                FontSize = 11,
-                HeightRequest = 28,
-                MinimumWidthRequest = 60
+                Padding = new Thickness(6, 2),
+                FontSize = 10,
+                HeightRequest = 24,
+                MinimumWidthRequest = 50
             };
 
             button.Clicked += (s, e) => SelectLLM(llm);
@@ -299,6 +476,33 @@ public partial class LLMChatView : ContentView
     private async void OnSendClicked(object sender, EventArgs e)
     {
         await SendMessage();
+    }
+
+    /// <summary>
+    /// Handle Close Chat button click
+    /// </summary>
+    private void OnCloseChatClicked(object? sender, EventArgs e)
+    {
+        try
+        {
+            System.Diagnostics.Debug.WriteLine("[LLMChatView] Close Chat button clicked");
+
+            // Clear the current chat session
+            _chatSession.ClearConversation();
+
+            // Reset the file context
+            _chatSession.CurrentFilePath = null;
+            _chatSession.CurrentFileContent = null;
+
+            // Clear the message display
+            MessagesContainer.Children.Clear();
+
+            System.Diagnostics.Debug.WriteLine("[LLMChatView] Chat session closed and cleared");
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] Error closing chat: {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -379,21 +583,40 @@ public partial class LLMChatView : ContentView
             if (!string.IsNullOrEmpty(_chatSession.CurrentFileContent))
             {
                 var fileContent = _chatSession.CurrentFileContent;
+                var fileName = Path.GetFileName(_chatSession.CurrentFilePath);
 
-                // Check if file is too large (>100KB)
-                var contextMessage = $"File: {_chatSession.CurrentFilePath}\n\n";
-                if (fileContent.Length > 100_000)
+                // Reduce file size limit to avoid token limits (aim for ~2K characters for system message)
+                var maxSystemMessageSize = 2_000;
+                var contextMessage = $"File: {fileName}\n\n";
+
+                // Truncate file content more aggressively to stay within system message limits
+                if (fileContent.Length > maxSystemMessageSize - 200) // Reserve 200 chars for filename and text
                 {
-                    contextMessage += "[File content truncated due to size]\n\n";
-                    fileContent = fileContent[..100_000];
+                    contextMessage += "[Content truncated for brevity]\n\n";
+                    fileContent = fileContent[..(maxSystemMessageSize - 200)];
                 }
 
-                contextMessage += "```\n" + fileContent + "\n```";
+                contextMessage += fileContent;
+
+                // Final safety check - ensure system message doesn't exceed limit
+                if (contextMessage.Length > maxSystemMessageSize)
+                {
+                    contextMessage = contextMessage[..maxSystemMessageSize] + "...";
+                }
+
                 history.Add(("system", contextMessage));
+
+                System.Diagnostics.Debug.WriteLine($"[LLMChatView] Added file context for {fileName}, file content length: {fileContent.Length}");
+                System.Diagnostics.Debug.WriteLine($"[LLMChatView] System message length: {contextMessage.Length}");
+                System.Diagnostics.Debug.WriteLine($"[LLMChatView] Context message preview: {contextMessage.Substring(0, Math.Min(150, contextMessage.Length))}...");
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine("[LLMChatView] No file content available for context");
             }
 
-            // Add conversation history (last 10 messages for context)
-            foreach (var msg in _chatSession.Messages.TakeLast(10).Where(m => !m.IsError))
+            // Add conversation history (last 5 messages for context to reduce token usage)
+            foreach (var msg in _chatSession.Messages.TakeLast(5).Where(m => !m.IsError))
             {
                 history.Add((msg.Role, msg.Content));
             }
@@ -403,11 +626,31 @@ public partial class LLMChatView : ContentView
             {
                 try
                 {
+                    System.Diagnostics.Debug.WriteLine($"[LLMChatView] Sending to {llm.Name}:");
+                    System.Diagnostics.Debug.WriteLine($"[LLMChatView] History count: {history.Count}");
+                    if (history.Count > 0)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[LLMChatView] First history entry ({history[0].Role}): {history[0].Content.Substring(0, Math.Min(100, history[0].Content.Length))}...");
+                    }
+                    System.Diagnostics.Debug.WriteLine($"[LLMChatView] User message: {actualMessage}");
+
+                    // Calculate total content size for debugging
+                    var totalContentSize = history.Sum(h => h.Content.Length) + actualMessage.Length;
+                    System.Diagnostics.Debug.WriteLine($"[LLMChatView] Total content size: {totalContentSize} characters");
+
                     var response = await llm.SendChatMessageAsync(history, actualMessage);
                     _chatSession.AddAssistantMessage(response, llm.Name);
                 }
+                catch (HttpRequestException httpEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[LLMChatView] HTTP Error from {llm.Name}: {httpEx.Message}");
+                    System.Diagnostics.Debug.WriteLine($"[LLMChatView] StatusCode: {httpEx.StatusCode}");
+                    _chatSession.AddErrorMessage($"HTTP {httpEx.StatusCode}: {httpEx.Message}", llm.Name);
+                }
                 catch (Exception ex)
                 {
+                    System.Diagnostics.Debug.WriteLine($"[LLMChatView] Error from {llm.Name}: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"[LLMChatView] Exception type: {ex.GetType().Name}");
                     _chatSession.AddErrorMessage(ex.Message, llm.Name);
                 }
             });
@@ -607,36 +850,85 @@ public partial class LLMChatView : ContentView
             MessagesContainer.Children.Add(messageView);
         }
 
-        // Debug scroll information
+        // Debug information before layout
         System.Diagnostics.Debug.WriteLine($"[LLMChatView] Messages count: {_chatSession.Messages.Count}");
-        System.Diagnostics.Debug.WriteLine($"[LLMChatView] ScrollView content height: {ChatScrollView.Content?.Height ?? 0}");
+        System.Diagnostics.Debug.WriteLine($"[LLMChatView] MessagesContainer children: {MessagesContainer.Children.Count}");
+        System.Diagnostics.Debug.WriteLine($"[LLMChatView] ScrollView content height (before): {ChatScrollView.Content?.Height ?? 0}");
 
-        // Scroll to bottom with more reliable method
+        // Force the VerticalStackLayout to measure its content properly
         MainThread.BeginInvokeOnMainThread(async () =>
         {
-            await Task.Delay(150); // Give UI more time to render
+            await Task.Delay(100); // Let UI start processing
 
             try
             {
-                // Force layout update
+                // Force the MessagesContainer to recalculate its size
+                MessagesContainer.InvalidateMeasure();
+                await Task.Delay(50);
+
+                // Force measure on the entire view hierarchy
                 this.InvalidateMeasure();
                 await Task.Delay(50);
 
-                // Multiple scroll attempts for reliability
-                await ChatScrollView.ScrollToAsync(ChatScrollView, ScrollToPosition.End, animated: false);
-                await Task.Delay(25);
-
-                // Alternative scroll method
+                // Force the ScrollView content to remeasure
                 if (ChatScrollView.Content != null)
                 {
-                    await ChatScrollView.ScrollToAsync(0, ChatScrollView.Content.Height, animated: false);
+                    ChatScrollView.Content.InvalidateMeasure();
+                }
+                ChatScrollView.InvalidateMeasure();
+                await Task.Delay(100);
+
+                // Debug information after layout updates
+                System.Diagnostics.Debug.WriteLine($"[LLMChatView] ScrollView height: {ChatScrollView.Height}");
+                System.Diagnostics.Debug.WriteLine($"[LLMChatView] ScrollView content height (after): {ChatScrollView.Content?.Height ?? 0}");
+                System.Diagnostics.Debug.WriteLine($"[LLMChatView] MessagesContainer height: {MessagesContainer.Height}");
+                System.Diagnostics.Debug.WriteLine($"[LLMChatView] MessagesContainer measured height: {MessagesContainer.DesiredSize.Height}");
+                System.Diagnostics.Debug.WriteLine($"[LLMChatView] Parent Grid height: {(this.Parent as View)?.Height ?? 0}");
+
+                // Check if content actually exceeds viewport
+                var contentHeight = ChatScrollView.Content?.Height ?? 0;
+                var viewportHeight = ChatScrollView.Height;
+                var needsScrolling = contentHeight > viewportHeight;
+
+                System.Diagnostics.Debug.WriteLine($"[LLMChatView] Content height: {contentHeight}, Viewport height: {viewportHeight}, Needs scrolling: {needsScrolling}");
+                System.Diagnostics.Debug.WriteLine($"[LLMChatView] Grid Row 1 should be fixed at 250px - ScrollView viewport should be ~250px");
+
+                // If content doesn't seem to exceed viewport but we have many messages,
+                // the ScrollView should still show scrollbar due to fixed Grid row height (250px)
+                if (!needsScrolling && _chatSession.Messages.Count > 3)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[LLMChatView] Content should scroll due to Grid Row 1 fixed height=250px");
+
+                    // Force a final layout measure to ensure scrollbar appears
+                    ChatScrollView.InvalidateMeasure();
+                    await Task.Delay(50);
                 }
 
-                System.Diagnostics.Debug.WriteLine($"[LLMChatView] Scrolled to bottom. ScrollView height: {ChatScrollView.Height}, Content height: {ChatScrollView.Content?.Height ?? 0}");
+                // Scroll to bottom with multiple methods
+                if (ChatScrollView.Content != null)
+                {
+                    await ChatScrollView.ScrollToAsync(0, contentHeight, animated: false);
+                    await Task.Delay(50);
+
+                    // Try alternative method
+                    await ChatScrollView.ScrollToAsync(ChatScrollView, ScrollToPosition.End, animated: false);
+                }
+
+#if WINDOWS || MACCATALYST
+                // Enable keyboard navigation by focusing the ScrollView for desktop platforms
+                ChatScrollView.Focus();
+                System.Diagnostics.Debug.WriteLine("[LLMChatView] ScrollView focused for keyboard navigation");
+                System.Diagnostics.Debug.WriteLine("[LLMChatView] Try clicking in the chat area and then use PageUp/PageDown/Home/End/Arrow keys");
+
+                // Additional focus attempt after a delay
+                await Task.Delay(100);
+                ChatScrollView.Focus();
+                System.Diagnostics.Debug.WriteLine("[LLMChatView] Second focus attempt completed");
+#endif
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[LLMChatView] Error scrolling to bottom: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[LLMChatView] Error in RefreshMessageDisplay: {ex.Message}");
             }
         });
     }
@@ -668,20 +960,44 @@ public partial class LLMChatView : ContentView
             VerticalOptions = LayoutOptions.Center
         };
 
+        // Check if this is a real file that exists on the filesystem
+        var isRealFile = File.Exists(chatFilePath);
+        var isCloudFile = IsCloudFile(chatFilePath, out var cloudUrl);
+        var isVirtualPath = !isRealFile && !isCloudFile;
+
+        // Debug output for path checking
+        System.Diagnostics.Debug.WriteLine($"[LLMChatView] Chat file path: '{chatFilePath}'");
+        System.Diagnostics.Debug.WriteLine($"[LLMChatView] File.Exists result: {isRealFile}");
+        System.Diagnostics.Debug.WriteLine($"[LLMChatView] IsCloudFile result: {isCloudFile}");
+        System.Diagnostics.Debug.WriteLine($"[LLMChatView] IsVirtualPath: {isVirtualPath}");
+        if (!string.IsNullOrEmpty(cloudUrl))
+        {
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] Cloud URL: '{cloudUrl}'");
+        }
+
         var linkLabel = new Label
         {
             Text = $"Chat file: {System.IO.Path.GetFileName(chatFilePath)}",
             FontSize = 12,
-            TextColor = Colors.Blue,
-            VerticalOptions = LayoutOptions.Center,
-            GestureRecognizers =
-            {
-                new TapGestureRecognizer
-                {
-                    Command = new Command(async () => await OpenChatFile(chatFilePath))
-                }
-            }
+            TextColor = isVirtualPath ? Colors.Gray : Colors.Blue,
+            VerticalOptions = LayoutOptions.Center
         };
+
+        // Add tap gesture for real files or cloud files
+        if (isRealFile)
+        {
+            linkLabel.GestureRecognizers.Add(new TapGestureRecognizer
+            {
+                Command = new Command(async () => await OpenChatFile(chatFilePath))
+            });
+        }
+        else if (isCloudFile && !string.IsNullOrEmpty(cloudUrl))
+        {
+            linkLabel.GestureRecognizers.Add(new TapGestureRecognizer
+            {
+                Command = new Command(async () => await OpenCloudFile(cloudUrl))
+            });
+        }
 
         var pathLabel = new Label
         {
@@ -700,6 +1016,109 @@ public partial class LLMChatView : ContentView
     }
 
     /// <summary>
+    /// Check if the file path represents a cloud file and generate web URL
+    /// </summary>
+    private static bool IsCloudFile(string filePath, out string webUrl)
+    {
+        webUrl = string.Empty;
+
+        try
+        {
+            // Google Drive patterns
+            if (filePath.Contains("drive.google.com") || filePath.Contains("/Google Drive/") || filePath.Contains("gdocs://"))
+            {
+                // Extract file ID from Google Drive URL or path
+                var fileId = ExtractGoogleDriveFileId(filePath);
+                if (!string.IsNullOrEmpty(fileId))
+                {
+                    webUrl = $"https://drive.google.com/file/d/{fileId}/view";
+                    return true;
+                }
+            }
+
+            // OneDrive patterns
+            if (filePath.Contains("onedrive.live.com") || filePath.Contains("/OneDrive/") || filePath.Contains("1drv.ms/"))
+            {
+                // Extract OneDrive file ID or use direct URL
+                if (filePath.Contains("onedrive.live.com"))
+                {
+                    webUrl = filePath;
+                    return true;
+                }
+            }
+
+            // Dropbox patterns
+            if (filePath.Contains("dropbox.com") || filePath.Contains("/Dropbox/"))
+            {
+                // Generate Dropbox share URL
+                if (filePath.Contains("dropbox.com"))
+                {
+                    webUrl = filePath;
+                    return true;
+                }
+            }
+
+            // iCloud patterns
+            if (filePath.Contains("icloud.com") || filePath.Contains("/iCloud/"))
+            {
+                if (filePath.Contains("icloud.com"))
+                {
+                    webUrl = filePath;
+                    return true;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] Error checking cloud file: {ex.Message}");
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Extract Google Drive file ID from various path formats
+    /// </summary>
+    private static string? ExtractGoogleDriveFileId(string filePath)
+    {
+        // Pattern 1: Direct Google Drive URL
+        var urlMatch = Regex.Match(filePath, @"drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)");
+        if (urlMatch.Success)
+            return urlMatch.Groups[1].Value;
+
+        // Pattern 2: Google Drive export URL
+        var exportMatch = Regex.Match(filePath, @"docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9_-]+)");
+        if (exportMatch.Success)
+            return exportMatch.Groups[1].Value;
+
+        // Pattern 3: Look for existing file ID in path
+        var idMatch = Regex.Match(filePath, @"([a-zA-Z0-9_-]{33})");
+        if (idMatch.Success)
+            return idMatch.Groups[1].Value;
+
+        return null;
+    }
+
+    /// <summary>
+    /// Open cloud file in browser
+    /// </summary>
+    private static async Task OpenCloudFile(string webUrl)
+    {
+        try
+        {
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] Opening cloud file in browser: {webUrl}");
+
+            // Open in default browser
+            await Browser.Default.OpenAsync(webUrl, BrowserLaunchMode.SystemPreferred);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] Error opening cloud file: {ex.Message}");
+            await DisplayAlert("Error", $"Could not open cloud file: {ex.Message}", "OK");
+        }
+    }
+
+    /// <summary>
     /// Open the chat file
     /// </summary>
     private static async Task OpenChatFile(string chatFilePath)
@@ -707,6 +1126,18 @@ public partial class LLMChatView : ContentView
         try
         {
             System.Diagnostics.Debug.WriteLine($"[LLMChatView] Opening chat file: {chatFilePath}");
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] Full path: {Path.GetFullPath(chatFilePath)}");
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] Current directory: {Directory.GetCurrentDirectory()}");
+            System.Diagnostics.Debug.WriteLine($"[LLMChatView] File.Exists before open: {File.Exists(chatFilePath)}");
+
+            // Check if the file actually exists on the filesystem
+            if (!File.Exists(chatFilePath))
+            {
+                System.Diagnostics.Debug.WriteLine($"[LLMChatView] Cannot open virtual/non-existent file: {chatFilePath}");
+                await DisplayAlert("Cannot Open File",
+                    "This chat file is stored in a virtual location and cannot be opened with the system file manager.", "OK");
+                return;
+            }
 
             // Try to open with default application
             await Launcher.Default.OpenAsync(new OpenFileRequest
@@ -785,11 +1216,13 @@ public partial class LLMChatView : ContentView
         stack.Children.Add(header);
 
         // Content
-        var content = new Label
+        var content = new Editor
         {
             Text = message.IsError ? message.ErrorMessage : message.Content,
-            TextType = TextType.Text,
-            FontSize = 14
+            FontSize = 14,
+            AutoSize = EditorAutoSizeOption.TextChanges,
+            IsReadOnly = true,
+            BackgroundColor = Colors.Transparent
         };
 
         stack.Children.Add(content);

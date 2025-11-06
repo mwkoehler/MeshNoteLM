@@ -348,13 +348,13 @@ public partial class MainPageCodeOnly : ContentPage
             var fileExtension = System.IO.Path.GetExtension(node.Name)?.ToLowerInvariant();
             var isTextFile = fileExtension switch
             {
-                ".txt" or ".json" or ".xml" or ".cs" or ".xaml" or ".html" or ".css" or ".js" => true,
+                ".txt" or ".json" or ".xml" or ".cs" or ".xaml" or ".html" or ".css" or ".js" or ".md" or ".markdown" or ".yml" or ".yaml" or ".py" or ".ts" or ".jsx" or ".tsx" or ".vue" or ".php" or ".rb" or ".go" or ".rs" or ".swift" or ".kt" or ".java" or ".sql" or ".sh" or ".bat" or ".ps1" or ".csv" or ".log" or ".ini" or ".cfg" or ".conf" or ".toml" => true,
                 _ => false
             };
 
             if (isTextFile)
             {
-                // Use text editor for text files
+                // Use text editor for text files only
                 var content = node.Plugin.ReadFile(node.FullPath);
                 _editor.IsVisible = true;
                 _viewerContainer.IsVisible = false;
@@ -367,38 +367,23 @@ public partial class MainPageCodeOnly : ContentPage
             }
             else
             {
-                // Use document viewer for binary files
-                var fileData = node.Plugin.ReadFileBytes(node.FullPath);
-                var viewer = FileViewerHelper.CreateViewerForFile(node.Name, fileData);
+                // Skip binary files entirely - don't view them or use them as context
+                System.Diagnostics.Debug.WriteLine($"[MainPage] Skipping binary file: {node.Name}");
 
-                if (viewer != null)
-                {
-                    _editor.IsVisible = false;
-                    _viewerContainer.IsVisible = true;
+                // Clear any existing context and viewer
+                _editor.IsVisible = false;
+                _viewerContainer.IsVisible = false;
+                _viewerContainer.Content = null;
+                _editor.Text = string.Empty;
 
-                    // Set size properties for the viewer
-                    viewer.HorizontalOptions = LayoutOptions.Fill;
-                    viewer.VerticalOptions = LayoutOptions.Fill;
+                // Don't set any context for binary files
+                _chatView.SetFileContext(null, null);
 
-                    _viewerContainer.Content = viewer;
-
-                    // For non-text files, set a simplified context for chat
-                    _chatView.SetFileContext(node.FullPath, $"[Binary file: {node.Name}]");
-
-                    System.Diagnostics.Debug.WriteLine($"[MainPage] Loaded {fileData.Length} bytes in document viewer");
-                    System.Diagnostics.Debug.WriteLine($"[MainPage] Viewer type: {viewer.GetType().Name}");
-                    System.Diagnostics.Debug.WriteLine($"[MainPage] ViewerContainer.IsVisible: {_viewerContainer.IsVisible}");
-                    System.Diagnostics.Debug.WriteLine($"[MainPage] ViewerContainer.Content: {_viewerContainer.Content?.GetType().Name}");
-                }
-                else
-                {
-                    // Fallback to text editor if viewer creation failed
-                    var content = node.Plugin.ReadFile(node.FullPath);
-                    _editor.IsVisible = true;
-                    _viewerContainer.IsVisible = false;
-                    _editor.Text = content;
-                    _chatView.SetFileContext(node.FullPath, content);
-                }
+                // Inform the user that binary files are not supported
+                await DisplayAlert("Unsupported File Type",
+                    $"Binary files like '{node.Name}' are not supported for viewing or LLM context. Only text files can be used.",
+                    "OK");
+                return; // Don't proceed further
             }
 
             // Ensure View panel is visible to show the loaded file

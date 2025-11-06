@@ -69,15 +69,25 @@ public class GeminiPlugin : AIProviderPluginBase
         try
         {
             var contents = new List<object>();
+            string? systemInstruction = null;
 
-            // Add conversation history
+            // Process conversation history - separate system messages
             foreach (var msg in conversationHistory)
             {
-                contents.Add(new
+                if (msg.Role == "system")
                 {
-                    role = msg.Role,
-                    parts = new[] { new { text = msg.Content } }
-                });
+                    // Gemini uses systemInstruction parameter for system messages
+                    systemInstruction = msg.Content;
+                }
+                else
+                {
+                    // Only add user/assistant messages to contents array
+                    contents.Add(new
+                    {
+                        role = msg.Role,
+                        parts = new[] { new { text = msg.Content } }
+                    });
+                }
             }
 
             // Add new user message
@@ -87,17 +97,34 @@ public class GeminiPlugin : AIProviderPluginBase
                 parts = new[] { new { text = userMessage } }
             });
 
-            var requestBody = new
+            // Build request body with system instruction if present
+            var requestBody = new Dictionary<string, object>
             {
-                contents = contents
+                ["contents"] = contents
             };
 
+            if (!string.IsNullOrEmpty(systemInstruction))
+            {
+                requestBody["systemInstruction"] = new
+                {
+                    text = systemInstruction
+                };
+                System.Diagnostics.Debug.WriteLine($"[GeminiPlugin] System instruction length: {systemInstruction.Length}");
+            }
+
             var json = JsonSerializer.Serialize(requestBody);
+            System.Diagnostics.Debug.WriteLine($"[GeminiPlugin] Request body: {json}");
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             var url = $"{API_BASE}/models/{DEFAULT_MODEL}:generateContent?key={_apiKey}";
             var response = await _httpClient.PostAsync(url, content);
-            response.EnsureSuccessStatusCode();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorJson = await response.Content.ReadAsStringAsync();
+                System.Diagnostics.Debug.WriteLine($"[GeminiPlugin] API Error ({response.StatusCode}): {errorJson}");
+                return $"[API Error {response.StatusCode}: {errorJson}]";
+            }
 
             var responseJson = await response.Content.ReadAsStringAsync();
             var doc = JsonDocument.Parse(responseJson);
@@ -120,8 +147,14 @@ public class GeminiPlugin : AIProviderPluginBase
 
             return "[Error: Unexpected response format]";
         }
+        catch (HttpRequestException httpEx)
+        {
+            System.Diagnostics.Debug.WriteLine($"[GeminiPlugin] HTTP Error: {httpEx.Message}");
+            return $"[HTTP Error: {httpEx.Message}]";
+        }
         catch (Exception ex)
         {
+            System.Diagnostics.Debug.WriteLine($"[GeminiPlugin] Exception: {ex.GetType().Name} - {ex.Message}");
             return $"[Error: {ex.Message}]";
         }
     }

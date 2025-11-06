@@ -73,24 +73,41 @@ public class OpenAIPlugin : AIProviderPluginBase
         {
             var messages = new List<object>();
 
+            // Process conversation history - include system messages in the array
             foreach (var msg in conversationHistory)
             {
+                // Add all messages including system messages to the messages array
                 messages.Add(new { role = msg.Role, content = msg.Content });
             }
 
             messages.Add(new { role = "user", content = userMessage });
 
-            var requestBody = new
+            // Build request body
+            var requestBody = new Dictionary<string, object>
             {
-                model = DEFAULT_MODEL,
-                messages = messages
+                ["model"] = DEFAULT_MODEL,
+                ["messages"] = messages
             };
 
+            // Count system messages for debugging
+            var systemMessageCount = conversationHistory.Count(m => m.Role == "system");
+            if (systemMessageCount > 0)
+            {
+                System.Diagnostics.Debug.WriteLine($"[OpenAIPlugin] Added {systemMessageCount} system messages to messages array");
+            }
+
             var json = JsonSerializer.Serialize(requestBody);
+            System.Diagnostics.Debug.WriteLine($"[OpenAIPlugin] Request body: {json}");
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             var response = await _httpClient.PostAsync($"{API_BASE}/chat/completions", content);
-            response.EnsureSuccessStatusCode();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorJson = await response.Content.ReadAsStringAsync();
+                System.Diagnostics.Debug.WriteLine($"[OpenAIPlugin] API Error ({response.StatusCode}): {errorJson}");
+                return $"[API Error {response.StatusCode}: {errorJson}]";
+            }
 
             var responseJson = await response.Content.ReadAsStringAsync();
             var doc = JsonDocument.Parse(responseJson);
@@ -108,8 +125,14 @@ public class OpenAIPlugin : AIProviderPluginBase
 
             return "[Error: Unexpected response format]";
         }
+        catch (HttpRequestException httpEx)
+        {
+            System.Diagnostics.Debug.WriteLine($"[OpenAIPlugin] HTTP Error: {httpEx.Message}");
+            return $"[HTTP Error: {httpEx.Message}]";
+        }
         catch (Exception ex)
         {
+            System.Diagnostics.Debug.WriteLine($"[OpenAIPlugin] Exception: {ex.GetType().Name} - {ex.Message}");
             return $"[Error: {ex.Message}]";
         }
     }

@@ -73,28 +73,52 @@ public class ClaudePlugin : AIProviderPluginBase
         try
         {
             var messages = new List<object>();
+            string? systemMessage = null;
 
-            // Add conversation history
+            // Process conversation history - separate system messages from conversation
             foreach (var msg in conversationHistory)
             {
-                messages.Add(new { role = msg.Role, content = msg.Content });
+                if (msg.Role == "system")
+                {
+                    // Claude expects system messages as a separate parameter
+                    systemMessage = msg.Content;
+                }
+                else
+                {
+                    // Only add user/assistant messages to the messages array
+                    messages.Add(new { role = msg.Role, content = msg.Content });
+                }
             }
 
             // Add new user message
             messages.Add(new { role = "user", content = userMessage });
 
-            var requestBody = new
+            // Build request body with system message as separate parameter if present
+            var requestBody = new Dictionary<string, object>
             {
-                model = DEFAULT_MODEL,
-                max_tokens = 4096,
-                messages = messages
+                ["model"] = DEFAULT_MODEL,
+                ["max_tokens"] = 4096,
+                ["messages"] = messages
             };
 
+            if (!string.IsNullOrEmpty(systemMessage))
+            {
+                requestBody["system"] = systemMessage;
+                System.Diagnostics.Debug.WriteLine($"[ClaudePlugin] System message length: {systemMessage.Length}");
+            }
+
             var json = JsonSerializer.Serialize(requestBody);
+            System.Diagnostics.Debug.WriteLine($"[ClaudePlugin] Request body: {json}");
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             var response = await _httpClient.PostAsync($"{API_BASE}/messages", content);
-            response.EnsureSuccessStatusCode();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorJson = await response.Content.ReadAsStringAsync();
+                System.Diagnostics.Debug.WriteLine($"[ClaudePlugin] API Error ({response.StatusCode}): {errorJson}");
+                return $"[API Error {response.StatusCode}: {errorJson}]";
+            }
 
             var responseJson = await response.Content.ReadAsStringAsync();
             var doc = JsonDocument.Parse(responseJson);
@@ -111,8 +135,14 @@ public class ClaudePlugin : AIProviderPluginBase
 
             return "[Error: Unexpected response format]";
         }
+        catch (HttpRequestException httpEx)
+        {
+            System.Diagnostics.Debug.WriteLine($"[ClaudePlugin] HTTP Error: {httpEx.Message}");
+            return $"[HTTP Error: {httpEx.Message}]";
+        }
         catch (Exception ex)
         {
+            System.Diagnostics.Debug.WriteLine($"[ClaudePlugin] Exception: {ex.GetType().Name} - {ex.Message}");
             return $"[Error: {ex.Message}]";
         }
     }
@@ -120,6 +150,7 @@ public class ClaudePlugin : AIProviderPluginBase
     protected override IEnumerable<string> GetAvailableModels()
     {
         yield return "claude-3-opus-20240229";
+        yield return "claude-3-5-sonnet-20241022";
         yield return "claude-3-5-haiku-20241022";
         yield return "claude-3-haiku-20240307";
     }
