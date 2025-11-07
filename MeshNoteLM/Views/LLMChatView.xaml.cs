@@ -282,7 +282,7 @@ public partial class LLMChatView : ContentView
     /// <summary>
     /// Setup global keyboard handlers for the entire view
     /// </summary>
-    private void SetupGlobalKeyboardHandlers()
+    private static void SetupGlobalKeyboardHandlers()
     {
         try
         {
@@ -1234,20 +1234,28 @@ public partial class LLMChatView : ContentView
     /// <summary>
     /// Extract Google Drive file ID from various path formats
     /// </summary>
+    [GeneratedRegex(@"drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)")]
+    private static partial Regex GoogleDriveURL();
+    [GeneratedRegex(@"docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9_-]+)")]
+    private static partial Regex GoogleDriveExportURL();
+
+    [GeneratedRegex(@"([a-zA-Z0-9_-]{33})")]
+    private static partial Regex ExistingFileId();
+
     private static string? ExtractGoogleDriveFileId(string filePath)
     {
         // Pattern 1: Direct Google Drive URL
-        var urlMatch = Regex.Match(filePath, @"drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)");
+        var urlMatch = GoogleDriveURL().Match(filePath);
         if (urlMatch.Success)
             return urlMatch.Groups[1].Value;
 
         // Pattern 2: Google Drive export URL
-        var exportMatch = Regex.Match(filePath, @"docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9_-]+)");
+        var exportMatch = GoogleDriveExportURL().Match(filePath);
         if (exportMatch.Success)
             return exportMatch.Groups[1].Value;
 
         // Pattern 3: Look for existing file ID in path
-        var idMatch = Regex.Match(filePath, @"([a-zA-Z0-9_-]{33})");
+        var idMatch = ExistingFileId().Match(filePath);
         if (idMatch.Success)
             return idMatch.Groups[1].Value;
 
@@ -1558,7 +1566,7 @@ public partial class LLMChatView : ContentView
                     "File Exists",
                     $"A file named '{Path.GetFileName(newPath)}' already exists.",
                     "Cancel",
-                    null,
+                    "",
                     "Overwrite"
                 );
 
@@ -1580,7 +1588,7 @@ public partial class LLMChatView : ContentView
                     "Move Context File",
                     $"Also move the context file '{contextFileName}' to the same location?",
                     "No",
-                    null,
+                    "",
                     "Yes"
                 );
 
