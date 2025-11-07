@@ -45,7 +45,9 @@
       "Bash(dotnet add:*)",
       "Bash(dotnet test:*)",
       "Bash(cat:*)",
-      "Bash(claude:*)"
+      "Bash(claude:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []
